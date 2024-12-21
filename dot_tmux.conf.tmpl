@@ -1,0 +1,92 @@
+# Basic options
+set -g default-terminal "screen-256color"
+
+# Changement prefix par defaut C-b devient C-w
+set -g prefix C-w
+unbind C-b
+bind-key C-w send-prefix
+
+# Autre options
+set -g status-position top
+set -g mouse on
+
+# Creation de volet avec une nouvelle sequence
+unbind %
+bind | split-window -h
+unbind '"'
+bind - split-window -v
+
+# Sequence pour reload fichier de configuration
+unbind r
+bind r source-file ~/.tmux.conf
+
+# Modif taille des panes
+bind -r j resize-pane -D 5
+bind -r k resize-pane -U 5
+bind -r l resize-pane -R 5
+bind -r h resize-pane -L 5
+bind -r m resize-pane -Z
+
+# List of plugins
+set -g @plugin 'tmux-plugins/tpm'
+# set -g @plugin 'tmux-plugins/tmux-sensible'
+set -g @plugin 'catppuccin/tmux'
+
+# Other examples:
+# set -g @plugin 'github_username/plugin_name'
+# set -g @plugin 'github_username/plugin_name#branch'
+# set -g @plugin 'git@github.com:user/plugin'
+# set -g @plugin 'git@bitbucket.com:user/plugin'
+
+# Add my plugins
+set -g @plugin 'aaronpowell/tmux-weather'
+# Format d'affichage souhaité : %c pour l'icone de la météo, %t pour la température, %w pour la vitesse du vent
+set -g @forecast-format '%c+%t+%w'
+# Cette configuration nécessite une variable 'location' définie dans chezmoi.toml
+set -g @forecast-location {{ .location }}
+
+# Configuration de Catppuccin
+set -g @catppuccin_flavor "macchiato"
+set -g @catppuccin_status_background "none"
+set -g @catppuccin_window_status_style "none"
+set -g @catppuccin_pane_status_enabled "off"
+set -g @catppuccin_pane_border_status "off"
+
+# Partie gauche de la barre de status
+set -g status-left-length 100
+set -g status-left ""
+set -ga status-left "#{?client_prefix,#{#[bg=#{@thm_red},fg=#{@thm_bg},bold]  #S },#{#[bg=#{@thm_bg},fg=#{@thm_green}]  #S }}"
+set -ga status-left "#[bg=#{@thm_bg},fg=#{@thm_overlay_0},none]│"
+set -ga status-left "#[bg=#{@thm_bg},fg=#{@thm_maroon}]  #{pane_current_command} "
+set -ga status-left "#[bg=#{@thm_bg},fg=#{@thm_overlay_0},none]│"
+set -ga status-left "#[bg=#{@thm_bg},fg=#{@thm_blue}]  #{=/-32/...:#{s|$USER|~|:#{b:pane_current_path}}} "
+set -ga status-left "#[bg=#{@thm_bg},fg=#{@thm_overlay_0},none]#{?window_zoomed_flag,│,}"
+set -ga status-left "#[bg=#{@thm_bg},fg=#{@thm_yellow}]#{?window_zoomed_flag,  zoom ,}"
+
+# Partie droite de la barre de status
+set -g status-right-length 100
+set -g status-right ""
+set -ga status-right "#[bg=#{@thm_bg},fg=#{@thm_blue}] 󰭦 %Y-%m-%d 󰅐 %H:%M "
+set -ga status-right "#[bg=#{@thm_bg},fg=#{@thm_overlay_0}, none]│"
+set -ga status-right "#[bg=#{@thm_bg},fg=#{@thm_blue}]  #{forecast} "
+
+# Ajout configuration de tmux pour la barre de status
+set -g status-style "bg=#{@thm_bg}"
+set -g status-justify "absolute-centre"
+
+# Look & feel d'une fenêtre
+set -wg automatic-rename on
+set -g automatic-rename-format "Window"
+
+set -g window-status-format " #I#{?#{!=:#{window_name},Window},: #W,} "
+set -g window-status-style "bg=#{@thm_bg},fg=#{@thm_rosewater}"
+set -g window-status-last-style "bg=#{@thm_bg},fg=#{@thm_peach}"
+set -g window-status-activity-style "bg=#{@thm_red},fg=#{@thm_bg}"
+set -g window-status-bell-style "bg=#{@thm_red},fg=#{@thm_bg},bold"
+set -gF window-status-separator "#[bg=#{@thm_bg},fg=#{@thm_overlay_0}]│"
+
+set -g window-status-current-format " #I#{?#{!=:#{window_name},Window},: #W,} "
+set -g window-status-current-style "bg=#{@thm_peach},fg=#{@thm_bg},bold"
+
+# Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
+run '~/.tmux/plugins/tpm/tpm'
