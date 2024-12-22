@@ -1,4 +1,4 @@
-{{ $location := promptString "Quelle est votre ville pour le plugin tmux-forecast?" -}}
+{{ $location := promptIntOnce . "location" "Quelle est votre ville pour le plugin tmux-forecast?" -}}
 
 [data]
     location = {{ $location | quote }}
