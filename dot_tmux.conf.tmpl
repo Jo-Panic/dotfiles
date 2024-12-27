@@ -1,5 +1,10 @@
 # Basic options
 set -g default-terminal "screen-256color"
+# 3 lines added since i use Ghostty > tmux > yazi
+# it helps to display preview
+set -g allow-passthrough on
+set -ga update-environment TERM
+set -ga update-environment TERM_PROGRAM
 
 # Changement prefix par defaut C-b devient C-w
 set -g prefix C-w
