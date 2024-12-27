@@ -1,0 +1,24 @@
+# Fonts
+font-family = ""
+font-family = "MesloLGL Nerd Font Mono"
+font-size = 16
+font-thicken
+adjust-cell-height = -4
+adjust-underline-position = +2
+# Theme
+theme = "catppuccin-mocha"
+
+# Cursor setting
+shell-integration-features = no-cursor
+cursor-style = "block"
+cursor-style-blink = "true"
+adjust-cursor-height = -4
+# Mouse
+mouse-hide-while-typing
+
+# Background
+background-opacity = 0.85
+
+# No title
+title = " "
+macos-titlebar-style = hidden
