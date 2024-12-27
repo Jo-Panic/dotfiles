@@ -134,7 +134,9 @@ unset __conda_setup
 # <<< conda initialize <<<
 
 # Ajout du Shell Wrapper pour yazi
-# y pour lancer yazi. q pour quitter dans le répertoire de yazi. Q sans changer de repertoire.
+# y pour lancer yazi. 
+# Touche q pour quitter et se retrouver dans le répertoire sélectionné dans yazi.
+# Touche Q pour quitter sans changer de repertoire.
 function y() {
 	local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
 	yazi "$@" --cwd-file="$tmp"
