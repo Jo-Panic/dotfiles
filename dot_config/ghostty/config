@@ -23,3 +23,7 @@ background-opacity = 0.85
 title = " "
 macos-titlebar-style = hidden
 
+# Command to execute
+# launch tmux with a default session called other.
+# Using tmux-sessionizer.sh : if other session allready exists it automatically attach to it
+command = zsh --login -c "if command -v tmux >/dev/null 2>&1 && [ -x ~/.local/bin/tmux-sessionizer.sh ]; then ~/.local/bin/tmux-sessionizer.sh other; else zsh; fi"
