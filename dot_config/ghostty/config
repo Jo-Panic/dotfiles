@@ -1,10 +1,12 @@
 # Fonts
-font-family = ""
-font-family = "MesloLGL Nerd Font Mono"
+# font-family = ""
+# font-family = "MesloLGL Nerd Font Mono"
 font-size = 16
-font-thicken
-adjust-cell-height = -4
-adjust-underline-position = +2
+#font-thicken
+#adjust-cell-height = -4
+#adjust-underline-position = +2
+# term = "xterm-256color"
+font-feature = "calt 1, liga 1"
 # Theme
 theme = "catppuccin-mocha"
 
