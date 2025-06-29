@@ -1,0 +1,53 @@
+# for this to work you must configure sudo such that
+# it will be able to run the command without password
+# See /private/etc/sudoers/yabai file
+
+yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+sudo yabai --load-sa
+
+
+# bsp, stack, or float
+yabai -m config layout bsp
+
+yabai -m config window_placement second_child
+
+# padding
+yabai -m config top_padding 12
+yabai -m config bottom_padding 12
+yabai -m config left_padding 12
+yabai -m config right_padding 12
+yabai -m config window_gap 12
+
+# windows animation
+yabai -m config window_animation_duration 0.1
+yabai -m config window_animation_easing ease_out_quint
+
+# mouse settings
+yabai -m config mouse_follows_focus on
+
+yabai -m config mouse_modifier alt
+# left click + drag
+yabai -m config mouse_action1 move
+# right click + drag
+yabai -m config mouse_action2 resize
+
+yabai -m mouse_drop_action swap
+
+# Disable specific apps
+yabai -m rule --add app="^Réglages Système$" manage=off
+yabai -m rule --add app="^Calculette$" manage=off
+yabai -m rule --add app="^Mullvad VPN$" manage=off
+yabai -m rule --add app="^mpv$" manage=off
+yabai -m rule --add app="^Musique$" manage=off
+
+# Send specific app to space
+yabai -m rule --add app="^iTerm2$" space=1
+yabai -m rule --add app="^Ghostty$" space=1
+yabai -m rule --add app="^Proton Mail$" space=2
+yabai -m rule --add app="^Brave Browser$" space=3
+yabai -m rule --add app="^Obsidian$" space=4
+yabai -m rule --add app="^Affinity Photo 2$" space=5
+yabai -m rule --add app="^Firefox$" space=6
+yabai -m rule --add app="^Mullvad Browser$" space=7
+yabai -m rule --add app="^Tor Browser$" space=7
+

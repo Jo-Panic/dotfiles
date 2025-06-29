@@ -1,1 +1,11 @@
 **/.DS_Store
+
+{{- if ne .chezmoi.os "darwin" }}
+# Ignorer les fichiers spécifiques à macOS sur les autres OS
+.config/yabai/
+{{- end }}
+
+{{- if ne .chezmoi.os "linux" }}
+# Ignorer les fichiers spécifiques à Linux sur les autres OS (si besoin)
+# .config/linux-specific-tool/
+{{- end }}
