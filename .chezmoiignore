@@ -3,6 +3,7 @@
 {{- if ne .chezmoi.os "darwin" }}
 # Ignorer les fichiers spécifiques à macOS sur les autres OS
 .config/yabai/
+.config/skhd/
 {{- end }}
 
 {{- if ne .chezmoi.os "linux" }}
