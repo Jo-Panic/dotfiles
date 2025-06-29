@@ -1,12 +1,7 @@
 # Fonts
-# font-family = ""
-# font-family = "MesloLGL Nerd Font Mono"
 font-size = 16
-#font-thicken
-#adjust-cell-height = -4
-#adjust-underline-position = +2
-# term = "xterm-256color"
 font-feature = "calt 1, liga 1"
+
 # Theme
 theme = "catppuccin-mocha"
 
@@ -15,6 +10,7 @@ shell-integration-features = no-cursor
 cursor-style = "block"
 cursor-style-blink = "true"
 adjust-cursor-height = -4
+
 # Mouse
 mouse-hide-while-typing
 
@@ -23,9 +19,15 @@ background-opacity = 0.85
 
 # No title
 title = " "
-macos-titlebar-style = hidden
 
+#----------------------------------------#
+# MacOS only options                     #
+#----------------------------------------# 
+{{- if eq .chezmoi.os "darwin" }}
+macos-titlebar-style = hidden
+window-colorspace = "display-p3"
 # Command to execute
 # launch tmux with a default session called other.
 # Using tmux-sessionizer.sh : if other session allready exists it automatically attach to it
 command = zsh --login -c "if command -v tmux >/dev/null 2>&1 && [ -x ~/.local/bin/tmux-sessionizer.sh ]; then ~/.local/bin/tmux-sessionizer.sh other; else zsh; fi"
+{{- end }}
