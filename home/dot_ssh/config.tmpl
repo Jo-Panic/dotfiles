@@ -1,0 +1,15 @@
+Host *
+  AddKeysToAgent yes
+  IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
+Host github.com
+  Hostname github.com
+  User git
+
+Host nextcloud
+  Hostname {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/h7j47krd4fbvzfploouguweljm/ssh-Hostname" }}
+  Port {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/h7j47krd4fbvzfploouguweljm/ssh-Port" }} 
+
+Host wave
+  Hostname {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/oioe5bpthk7citrdpi3nopgsge/ssh-Hostname" }}
+  User {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/oioe5bpthk7citrdpi3nopgsge/ssh-User" }}
