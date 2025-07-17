@@ -1,9 +1,10 @@
+{{/* Configuration 1Password agent pour SSH */}}
+{{- if (and (eq .chezmoi.os "darwin") (stat (joinPath .chezmoi.homeDir "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock")) (eq .usage "dev")) -}}
 # 1Password agent config file for ssh keys
 # It helps 1Password to find correct keys for ssh
 # item = uuid of the 1Password item
-# vault = uuid of the 1Password vault if the given item
-{{- if eq .chezmoi.os "darwin" -}}
-  {{- if stat (joinPath .chezmoi.homeDir "Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock") -}}
+# vault = uuid of the 1Password vault of the given item
+
 [[ssh-keys]]
 item = "dmp6tgmrgxyaqc5dnc5vsjjrcu"
 vault = "cxm6fghiidg3m27eoo5ppimivm"
@@ -15,5 +16,5 @@ vault = "cxm6fghiidg3m27eoo5ppimivm"
 [[ssh-keys]]
 item = "nfecxy7e6q6lag4lpappx3nemi"
 vault = "cxm6fghiidg3m27eoo5ppimivm"
-  {{- end -}}
+
 {{- end -}}
