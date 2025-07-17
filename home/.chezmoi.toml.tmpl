@@ -1,4 +1,7 @@
-{{ $location := promptStringOnce . "location" "Quelle est votre ville pour le plugin tmux-forecast" -}}
+{{- $location := promptStringOnce . "location" "Quelle est votre ville pour le plugin tmux-forecast" -}}
+{{- $usageChoices := list "dev" "work" -}}
+{{- $usage := promptChoiceOnce . "usage" "Type d'utilisation" $usageChoices -}}
 
 [data]
     location = {{ $location | quote }}
+    usage = {{- $usage | toToml -}}
