@@ -66,3 +66,6 @@ lshift + lalt - 0x1A : yabai -m window --space 7;
 #shift + alt - 8 : yabai -m window --space 8;
 #shift + alt - ç : yabai -m window --space 9;
 #shift + alt - à : yabai -m window --space 10;
+
+# Keys for launching / switching apps
+cmd - return : open -a /Applications/Ghostty.app
