@@ -69,3 +69,5 @@ lshift + lalt - 0x1A : yabai -m window --space 7;
 
 # Keys for launching / switching apps
 cmd - return : open -a /Applications/Ghostty.app
+lshift + lalt + cmd - o : open -a /Applications/Obsidian.app
+lshift + lalt + cmd - m : open -a /Applications/Proton\ Mail.app
