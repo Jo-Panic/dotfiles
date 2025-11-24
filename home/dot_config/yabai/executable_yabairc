@@ -10,17 +10,25 @@ sudo yabai --load-sa
 yabai -m config layout bsp
 
 yabai -m config window_placement second_child
+yabai -m config focus_follows_mouse autofocus
 
 # padding
 yabai -m config top_padding 12
 yabai -m config bottom_padding 12
 yabai -m config left_padding 12
 yabai -m config right_padding 12
-yabai -m config window_gap 12
+yabai -m config window_gap 14
 
 # windows animation
 yabai -m config window_animation_duration 0.1
 yabai -m config window_animation_easing ease_out_quint
+
+# Opacity
+yabai -m config window_opacity on 
+yabai -m config window_opacity_duration 0.2
+yabai -m config active_window_opacity 1.0
+yabai -m config normal_window_opacity 0.9
+
 
 # mouse settings
 yabai -m config mouse_follows_focus on
@@ -39,6 +47,7 @@ yabai -m rule --add app="^Calculette$" manage=off
 yabai -m rule --add app="^Mullvad VPN$" manage=off
 yabai -m rule --add app="^mpv$" manage=off
 yabai -m rule --add app="^Musique$" manage=off
+yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info|Pref)" manage=off
 
 # Send specific app to space
 yabai -m rule --add app="^iTerm2$" space=1
