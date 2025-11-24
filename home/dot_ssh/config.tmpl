@@ -13,7 +13,8 @@ Host nextcloud
 Host wave
   Hostname {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/oioe5bpthk7citrdpi3nopgsge/ssh-Hostname" }}
   User {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/oioe5bpthk7citrdpi3nopgsge/ssh-User" }}
-  
+  Port {{ onepasswordRead "op://cxm6fghiidg3m27eoo5ppimivm/oioe5bpthk7citrdpi3nopgsge/ssh-port" }}
+
 {{- end }}
 
 Host github.com
