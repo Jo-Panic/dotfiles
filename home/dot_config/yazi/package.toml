@@ -1,5 +1,7 @@
 [plugin]
 deps = []
 
-[flavor]
-deps = [{ use = "yazi-rs/flavors:catppuccin-macchiato", rev = "fc8eeaa" }]
+[[flavor.deps]]
+use = "yazi-rs/flavors:catppuccin-macchiato"
+rev = "9276ffa"
+hash = "b069dba45e199684b16fa12d385642ed"
