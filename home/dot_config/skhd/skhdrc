@@ -71,3 +71,7 @@ lshift + lalt - 0x1A : yabai -m window --space 7;
 cmd - return : open -a /Applications/Ghostty.app
 lshift + lalt + cmd - o : open -a /Applications/Obsidian.app
 lshift + lalt + cmd - m : open -a /Applications/Proton\ Mail.app
+
+# Increase window size
+lshift + lalt - a : yabai -m window --resize right:+20:0
+lshift + lalt - w : yabai -m window --resize right:-20:0
