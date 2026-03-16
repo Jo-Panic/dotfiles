@@ -1,6 +1,5 @@
 #!/bin/bash
-#
-##### Adding icon app for each space #####
+
 sketchybar --add item space_apps left \
 	--set space_apps label.drawing=off \
 	background.drawing=off \

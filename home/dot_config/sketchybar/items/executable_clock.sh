@@ -1,5 +1,12 @@
 #!/bin/bash
-sketchybar --add item clock right \
+
+sketchybar --add item clock q \
 	--set clock update_freq=10 \
 	icon=􀉉 \
-	script="$PLUGIN_DIR/clock.sh"
+	icon.color=$TEXT \
+	label.color=$TEXT \
+	label.font="SF Pro:Semibold:13.0" \
+	background.color=$ITEM_BG_COLOR \
+	background.border_width=0 \
+	script="$PLUGIN_DIR/clock.sh" \
+	padding_right=24
