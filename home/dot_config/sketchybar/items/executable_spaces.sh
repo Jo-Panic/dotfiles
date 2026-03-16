@@ -7,12 +7,12 @@ for i in "${!SPACE_ICONS[@]}"; do
 	sketchybar --add space space.$sid left \
 		--set space.$sid space=$sid \
 		icon=${SPACE_ICONS[i]} \
-		icon.font="SF Pro:Bold:12.0" \
-		label.font="sketchybar-app-font:Regular:14.0" \
-		label.padding_right=18 \
+		icon.font="SF Pro:Bold:14.0" \
+		label.font="sketchybar-app-font:Regular:16.0" \
+		label.padding_right=20 \
 		label.y_offset=-1 \
 		background.color=0x00000000 \
 		background.corner_radius=6 \
-		background.height=22 \
+		background.height=24 \
 		script="$PLUGIN_DIR/space.sh"
 done

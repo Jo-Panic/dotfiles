@@ -11,6 +11,6 @@ if [ "$SELECTED" = "true" ]; then
 else
 	sketchybar --set $NAME \
 		background.drawing=off \
-		label.color=$MUTED_COLOR \
-		icon.color=$MUTED_COLOR
+		label.color=$SUBTEXT0 \
+		icon.color=$SUBTEXT0
 fi
