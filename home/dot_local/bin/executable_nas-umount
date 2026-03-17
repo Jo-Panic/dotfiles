@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+
+MOUNT_POINT="$HOME/mnt/medias"
+
+if mount | grep "on $MOUNT_POINT" 2>/dev/null; then
+  diskutil unmount $MOUNT_POINT
+else
+  echo "Pas monté : $MOUNT_POINT"
+fi

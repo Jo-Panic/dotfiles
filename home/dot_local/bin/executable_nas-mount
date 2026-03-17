@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+
+# === Configuration ===
+NAS_IP="192.168.40.3"
+SHARE="Media"
+MOUNT_POINT="$HOME/mnt/medias"
+
+OP_USER="op://73pus6uujgs25rkmbu3prdfkha/tob7kjteh5dcdpl6fsyrwdmigm/UTITLISATEUR/Utilisateur1"
+OP_PASS="op://73pus6uujgs25rkmbu3prdfkha/tob7kjteh5dcdpl6fsyrwdmigm/UTITLISATEUR/2B2509A5D45844758295074318FC6893"
+
+# === Vérifications ===
+if ! command -v op &>/dev/null; then
+  echo "Erreur : 1Password CLI (op) n'est pas installé."
+  exit 1
+fi
+
+if ! op whoami &>/dev/null; then
+  echo "Erreur : 1Password CLI n'est pas déverrouillé."
+  echo "Lance d'abord : eval \$(op signin)"
+  exit 1
+fi
+
+if mount | grep "on $MOUNT_POINT" 2>/dev/null; then
+  echo "Déjà monté : $MOUNT_POINT"
+  exit 0
+fi
+
+# === Création du point de montage ===
+mkdir -p "$MOUNT_POINT"
+
+# === Récupération des credentials via 1Password ===
+SMB_USER="$(op read "$OP_USER")"
+SMB_PASS="$(op read "$OP_PASS")"
+
+# === Montage via mount -t smbfs ===
+mount -t smbfs \
+  "//${SMB_USER}:${SMB_PASS}@${NAS_IP}/${SHARE}" \
+  "${MOUNT_POINT}"
+
+echo "Monté : //${NAS_IP}/${SHARE} → $MOUNT_POINT"
