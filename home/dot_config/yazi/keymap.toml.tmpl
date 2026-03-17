@@ -1,0 +1,13 @@
+[mgr]
+[[mgr.prepend_keymap]]
+on   = [ "g", "p" ]
+run  = "cd ~/Pictures"
+desc = "Cd to ~/Pictures"
+[[mgr.prepend_keymap]]
+on   = [ "g", "u" ]
+run  = "cd ~/Library/CloudStorage/ProtonDrive-{{ onepasswordRead "op://73pus6uujgs25rkmbu3prdfkha/iq557kdlpp5z4hkbc5y3b7a6wi/e-mail" }}-folder"
+desc = "Cd to Proton Drive folder"
+[[mgr.prepend_keymap]]
+on = ["E", "x"]
+run = "plugin exif-strip"
+desc = "Strip EXIF data from selected files"
