@@ -19,7 +19,7 @@ has_session() {
 if [[ $# -eq 1 ]]; then
   selected=$1
 else
-  selected=$(find ~/ ~/Documents ~/Projets ~/.config -mindepth 1 -maxdepth 1 -type d | fzf)
+  selected=$(find ~/ ~/Dev ~/Documents ~/Projets ~/.config -mindepth 1 -maxdepth 1 -type d | fzf)
 fi
 
 # Si aucun dossier n'a été sélectionné, le script se termine.
