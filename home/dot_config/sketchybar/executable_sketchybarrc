@@ -39,7 +39,6 @@ sketchybar --default icon.font="SF Pro:Semibold:14.0" \
 
 # ── Left: Workspaces ────────────────────────────────────────
 source $ITEM_DIR/spaces.sh
-source $ITEM_DIR/space_apps.sh
 
 # ── Center-left (q): Clock ───────────────────────────────────
 source $ITEM_DIR/clock.sh
@@ -49,7 +48,8 @@ source $ITEM_DIR/front_app.sh
 
 # ── Right: Modules ───────────────────────────────────────────
 # Ordre d'ajout = droite vers gauche
-# Résultat visuel : mullvad | network | volume | battery
+# Résultat visuel : mullvad | network | volume | battery | power
+source $ITEM_DIR/power.sh
 source $ITEM_DIR/battery.sh
 source $ITEM_DIR/volume.sh
 source $ITEM_DIR/network.sh
