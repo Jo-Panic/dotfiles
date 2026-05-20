@@ -68,10 +68,19 @@ lshift + lalt - 0x16 : yabai -m window --space 6;
 lshift + lalt - 0x1A : yabai -m window --space 7;
 lshift + lalt - 0x1C : yabai -m window --space 8;
 
-# Keys for launching / switching apps
-cmd - return : open -a /Applications/Ghostty.app
-lshift + lalt + cmd - o : open -a /Applications/Obsidian.app
-lshift + lalt + cmd - m : open -a /Applications/Proton\ Mail.app
+# ── Keys for launching / switching apps ──────────────────────
+# Lancement via wm-launch-app : pré-focus du space cible défini par
+# la règle yabai correspondante, puis open -a.
+# Évite le race condition borders/yabai au cold-start.
+# Source unique de vérité app→space : règles yabai dans yabairc.
+cmd - return                : ~/.local/bin/wm-launch-app Ghostty
+lshift + lalt + cmd - o     : ~/.local/bin/wm-launch-app Obsidian
+lshift + lalt + cmd - m     : ~/.local/bin/wm-launch-app "Proton Mail"
+lshift + lalt + cmd - b     : ~/.local/bin/wm-launch-app "Brave Browser"
+lshift + lalt + cmd - f     : ~/.local/bin/wm-launch-app Firefox
+lshift + lalt + cmd - u     : ~/.local/bin/wm-launch-app "Mullvad Browser"
+lshift + lalt + cmd - t     : ~/.local/bin/wm-launch-app "Tor Browser"
+lshift + lalt + cmd - p     : ~/.local/bin/wm-launch-app "Affinity Photo 2"
 
 # Increase window size
 lshift + lalt - a : yabai -m window --resize right:+20:0

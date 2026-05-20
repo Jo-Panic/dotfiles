@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# ~/.local/bin/wm-launch-app
+#
+# Lance une application macOS en pré-focalisant le space que yabai
+# lui assigne via ses règles (yabairc). Évite le race condition entre
+# yabai et JankyBorders au cold-start, qui produit des bordures
+# fantômes ou manquantes quand la fenêtre naît sur un space puis est
+# déplacée vers un autre.
+#
+# Source unique de vérité : les règles yabai. Pour réassigner une app
+# à un autre workspace, modifier uniquement yabairc — les bindings
+# skhd suivront automatiquement.
+#
+# Fallbacks inoffensifs :
+#   - yabai down ou ne répond pas    → lancement direct sans pré-focus
+#   - aucune règle ne cible l'app    → lancement direct sans pré-focus
+#   - l'app est déjà lancée          → open -a la refocus (pas de
+#                                       nouvelle fenêtre créée)
+#
+# Usage :
+#   wm-launch-app Ghostty
+#   wm-launch-app "Proton Mail"
+#   wm-launch-app "Affinity Photo 2"
+
+set -uo pipefail
+
+# PATH explicite : skhd lance dans un shell minimal sans le PATH
+# utilisateur. yabai et jq sont sous /opt/homebrew/bin sur Apple Silicon.
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+
+APP="${1:?usage: wm-launch-app <NomApp>}"
+
+# Cherche le space que les règles yabai assignent à cette app.
+# yabai stocke le pattern sous forme "^NomApp$" — on reconstruit le
+# même pattern pour le matching.
+space=$(yabai -m rule --list 2>/dev/null \
+  | jq -r --arg app "^${APP}\$" '.[] | select(.app == $app) | .space // empty' \
+  | head -n1)
+
+# Pré-focus du space cible si une règle existe et que yabai répond.
+# Échec silencieux : on lance l'app de toute façon.
+if [[ -n "${space:-}" ]]; then
+  yabai -m space --focus "$space" 2>/dev/null || true
+fi
+
+# open -a sans chemin → résolu par LaunchServices, plus robuste qu'un
+# chemin /Applications/... hardcodé (gère les apps dans ~/Applications,
+# les renommages, etc.).
+open -a "${APP}"
