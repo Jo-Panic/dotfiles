@@ -11,3 +11,7 @@ desc = "Cd to Proton Drive folder"
 on = ["E", "x"]
 run = "plugin exif-strip"
 desc = "Strip EXIF data from selected files"
+[[mgr.prepend_keymap]]
+on = ["E", "e"]
+run = "shell 'gimp \"$0\"' --orphan"
+desc = "Edit image in GIMP"
