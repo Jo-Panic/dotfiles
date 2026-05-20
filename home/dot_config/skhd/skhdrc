@@ -82,6 +82,8 @@ lshift + lalt + cmd - u     : ~/.local/bin/wm-launch-app "Mullvad Browser"
 lshift + lalt + cmd - t     : ~/.local/bin/wm-launch-app "Tor Browser"
 lshift + lalt + cmd - p     : ~/.local/bin/wm-launch-app "Affinity Photo 2"
 
-# Increase window size
-lshift + lalt - a : yabai -m window --resize right:+20:0
-lshift + lalt - w : yabai -m window --resize right:-20:0
+# Resize focused window — direction = sens du déplacement du bord
+cmd + ctrl - right : ~/.local/bin/yabai-resize right 20
+cmd + ctrl - left  : ~/.local/bin/yabai-resize left  20
+cmd + ctrl - up    : ~/.local/bin/yabai-resize up    20
+cmd + ctrl - down  : ~/.local/bin/yabai-resize down  20

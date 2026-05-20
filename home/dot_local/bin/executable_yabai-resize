@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ~/.local/bin/yabai-resize
+#
+# Redimensionne la fenêtre focalisée en choisissant le bord à déplacer
+# selon la direction demandée et la position de la fenêtre dans son
+# display.
+#
+# Usage : yabai-resize <direction> <amount>
+#   direction  : left | right | up | down
+#   amount     : nombre de pixels (toujours positif)
+#
+# Sémantique : la direction indique le SENS dans lequel le bord se
+# déplace, pas un agrandissement/réduction. Le bord choisi est celui
+# du même côté que la direction, sauf si la fenêtre est collée à ce
+# côté du display — auquel cas on prend le bord opposé.
+
+set -uo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+
+direction="${1:?usage: yabai-resize <left|right|up|down> <amount>}"
+amount="${2:?usage: yabai-resize <left|right|up|down> <amount>}"
+
+read -r wx wy ww wh < <(
+  yabai -m query --windows --window |
+    jq -r '"\(.frame.x|floor) \(.frame.y|floor) \(.frame.w|floor) \(.frame.h|floor)"'
+)
+read -r dx dy dw dh < <(
+  yabai -m query --displays --display |
+    jq -r '"\(.frame.x|floor) \(.frame.y|floor) \(.frame.w|floor) \(.frame.h|floor)"'
+)
+
+# Tolérance : window_gap (12) + padding (10) ≈ 22, on prend 30
+tol=30
+
+case "$direction" in
+right)
+  if (((dx + dw) - (wx + ww) < tol)); then
+    yabai -m window --resize left:${amount}:0
+  else
+    yabai -m window --resize right:${amount}:0
+  fi
+  ;;
+left)
+  if ((wx - dx < tol)); then
+    yabai -m window --resize right:-${amount}:0
+  else
+    yabai -m window --resize left:-${amount}:0
+  fi
+  ;;
+down)
+  if (((dy + dh) - (wy + wh) < tol)); then
+    yabai -m window --resize top:0:${amount}
+  else
+    yabai -m window --resize bottom:0:${amount}
+  fi
+  ;;
+up)
+  if ((wy - dy < tol)); then
+    yabai -m window --resize bottom:0:-${amount}
+  else
+    yabai -m window --resize top:0:-${amount}
+  fi
+  ;;
+*)
+  echo "direction invalide : $direction (attendu : left | right | up | down)" >&2
+  exit 2
+  ;;
+esac
