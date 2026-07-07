@@ -87,3 +87,7 @@ cmd + ctrl - right : ~/.local/bin/yabai-resize right 20
 cmd + ctrl - left  : ~/.local/bin/yabai-resize left  20
 cmd + ctrl - up    : ~/.local/bin/yabai-resize up    20
 cmd + ctrl - down  : ~/.local/bin/yabai-resize down  20
+
+# Restart yabai service (workaround pour fenêtres non découvertes,
+# ex. onglet Firefox 151 détaché)
+shift + alt + cmd - r : yabai --restart-service
