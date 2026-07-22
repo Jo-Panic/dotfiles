@@ -10,6 +10,8 @@
 
 source "$CONFIG_DIR/colors.sh"
 
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 # Extraction du numéro de space depuis $NAME (space.1 → 1)
 sid="${NAME#space.}"
 
