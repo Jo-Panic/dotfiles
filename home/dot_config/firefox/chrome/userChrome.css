@@ -2,13 +2,13 @@
 
 /* Taille du chrome — en px CSS, donc rendue à la bonne taille physique par écran */
 .tabbrowser-tab .tab-label {
-  font-size: 13px !important;
+  font-size: 14px !important;
 }
 #urlbar,
 #searchbar {
-  font-size: 13px !important;
+  font-size: 14px !important;
 }
 menupopup > menuitem,
 menupopup > menu {
-  font-size: 13px !important;
+  font-size: 14px !important;
 }
