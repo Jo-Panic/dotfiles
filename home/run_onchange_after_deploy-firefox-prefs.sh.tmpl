@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Re-run quand un fichier canonique change :
+# user.js        : {{ include "dot_config/firefox/user.js" | sha256sum }}
+# userChrome.css : {{ include "dot_config/firefox/chrome/userChrome.css" | sha256sum }}
+
+USERJS="$HOME/.config/firefox/user.js"
+USERCHROME="$HOME/.config/firefox/chrome/userChrome.css"
+
+deploy_into() {
+  local profile="$1"
+  [ -d "$profile" ] || return 0
+  cp "$USERJS" "$profile/user.js"
+  mkdir -p "$profile/chrome"
+  cp "$USERCHROME" "$profile/chrome/userChrome.css"
+  echo "  → $profile"
+}
+
+echo "Déploiement des préférences Firefox / Mullvad…"
+
+FF="$HOME/Library/Application Support/Firefox/Profiles"
+[ -d "$FF" ] && for p in "$FF"/*.default-release "$FF"/*.default; do deploy_into "$p"; done
+
+MB="$HOME/Library/Application Support/MullvadBrowser"
+[ -d "$MB" ] && for p in "$MB"/Profiles/*.default* "$MB"/*.default*; do deploy_into "$p"; done
+
+echo "Terminé."

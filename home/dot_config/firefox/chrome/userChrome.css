@@ -1,0 +1,14 @@
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/* Taille du chrome — en px CSS, donc rendue à la bonne taille physique par écran */
+.tabbrowser-tab .tab-label {
+  font-size: 13px !important;
+}
+#urlbar,
+#searchbar {
+  font-size: 13px !important;
+}
+menupopup > menuitem,
+menupopup > menu {
+  font-size: 13px !important;
+}
