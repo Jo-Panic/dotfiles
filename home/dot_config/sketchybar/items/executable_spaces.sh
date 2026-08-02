@@ -6,15 +6,19 @@
 #   - workspace non-vide   : texte standard
 #   - workspace vide       : texte muted
 #
-# Le rendu effectif (couleurs / background) est géré par
-# plugins/space.sh, qui interroge yabai à chaque événement.
+# ARCHITECTURE (depuis 2026-08-02)
 #
-# Événements d'abonnement :
-#   - space_change          : géré nativement (item type "space")
-#   - space_windows_change  : intégration sketchybar (peut être partielle)
-#   - window_change         : événement custom poussé par yabai (signals
-#                             dans yabairc) — couvre les changements de
-#                             fenêtres sur les workspaces non focalisés.
+# Les items `space.N` sont PASSIFS : ni `script`, ni `--subscribe`.
+# Ils ne portent que leur apparence et leur `click_script`.
+#
+# Un item unique et invisible, `spaces_watcher`, s'abonne aux
+# événements et repeint les 8 items en un seul appel sketchybar.
+#
+# Pourquoi ? Un `--subscribe` par item fait exécuter le script de
+# CHAQUE item abonné à CHAQUE occurrence de l'événement, quel que
+# soit le space concerné. Avec 8 items abonnés à space_windows_change,
+# une simple ouverture de fenêtre déclenchait 8 process shell + 8
+# query yabai — pour une information qui tient dans un seul $INFO.
 
 SPACE_ICONS=("1" "2" "3" "4" "5" "6" "7" "8")
 
@@ -30,7 +34,18 @@ for i in "${!SPACE_ICONS[@]}"; do
     background.color=0x00000000 \
     background.corner_radius=6 \
     background.height=24 \
-    click_script="yabai -m space --focus $sid" \
-    script="$PLUGIN_DIR/space.sh" \
-    --subscribe space.$sid space_windows_change window_change
+    click_script="yabai -m space --focus $sid"
 done
+
+# ── Contrôleur unique ────────────────────────────────────────
+# drawing=off  → jamais rendu, sert uniquement de porteur de script.
+# updates=on   → OBLIGATOIRE : avec le défaut `when_shown`, un item
+#                non dessiné ne voit jamais son script exécuté.
+sketchybar --add item spaces_watcher left \
+  --set spaces_watcher drawing=off \
+  updates=on \
+  script="$PLUGIN_DIR/space.sh" \
+  --subscribe spaces_watcher space_change \
+  space_windows_change \
+  display_change \
+  system_woke

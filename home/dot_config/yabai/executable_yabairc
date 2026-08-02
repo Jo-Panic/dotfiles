@@ -52,8 +52,8 @@ yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info
 # Send specific app to space
 yabai -m rule --add app="^iTerm2$" space=1
 yabai -m rule --add app="^Ghostty$" space=^1
-yabai -m rule --add app="^Proton Mail$" space=^2
-yabai -m rule --add app="^Brave Browser$" space=^3
+yabai -m rule --add app="^Proton Mail$" space=2
+yabai -m rule --add app="^Brave Browser$" space=3
 yabai -m rule --add app="^Obsidian$" space=^4
 yabai -m rule --add app="^Affinity Photo 2$" space=^5
 yabai -m rule --add app="^Firefox$" space=^6

@@ -23,7 +23,6 @@ sketchybar --add item power right \
   popup.background.border_color=$BAR_BORDER_COLOR \
   popup.background.border_width=1 \
   popup.background.corner_radius=12 \
-  popup.background.blur_radius=30 \
   popup.background.shadow.drawing=on \
   popup.background.shadow.color=0x80000000 \
   popup.background.shadow.distance=6 \
