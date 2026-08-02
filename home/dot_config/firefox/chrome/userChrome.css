@@ -12,3 +12,22 @@ menupopup > menuitem,
 menupopup > menu {
   font-size: 14px !important;
 }
+
+/* Barre d'adresse : le champ de saisie lui-même */
+#urlbar-input,
+#urlbar-input-container,
+#searchbar .searchbar-textbox {
+  font-size: 14px !important;
+}
+
+/* Suggestions déroulantes de la barre d'adresse (optionnel) */
+.urlbarView-row {
+  font-size: 14px !important;
+}
+
+/* Libellés des boutons de barre d'outils (menus, débordement, barre des marque-pages) */
+.toolbarbutton-1 .toolbarbutton-text,
+.toolbarbutton-text,
+.bookmark-item {
+  font-size: 14px !important;
+}
