@@ -60,19 +60,3 @@ yabai -m rule --add app="^Firefox$" space=^6
 yabai -m rule --add app="^Mullvad Browser$" space=^7
 yabai -m rule --add app="^Tor Browser$" space=^7
 
-# ── SketchyBar : relais des événements fenêtre ────────────────
-# Sketchybar ne détecte pas tout seul les modifications de contenu
-# des workspaces non focalisés. On lui pousse explicitement un
-# événement custom `window_change` à chaque création / destruction /
-# déplacement de fenêtre ou (dé)lancement d'app.
-#
-# Les labels rendent l'opération idempotente : recharger yabairc
-# ne crée pas de doublons.
-
-# for event in window_created window_destroyed window_moved \
-#             application_launched application_terminated; do
-#  label="sketchybar_${event}"
-#  yabai -m signal --remove "$label" 2>/dev/null
-#  yabai -m signal --add label="$label" event="$event" \
-#    action="/opt/homebrew/bin/sketchybar --trigger window_change"
-# done
