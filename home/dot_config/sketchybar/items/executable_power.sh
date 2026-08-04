@@ -29,7 +29,9 @@ sketchybar --add item power right \
   popup.horizontal=off \
   popup.align=right \
   popup.y_offset=6 \
-  click_script="sketchybar --set power popup.drawing=toggle"
+  click_script="sketchybar --set power popup.drawing=toggle" \
+  script="$PLUGIN_DIR/power-popup.sh" \
+  --subscribe power mouse.entered.global mouse.exited.global
 
 # ── Entrées du popup ─────────────────────────────────────────
 # Defaults communs (override les defaults globaux de sketchybarrc)
