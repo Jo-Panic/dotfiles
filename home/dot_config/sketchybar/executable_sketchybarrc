@@ -39,6 +39,7 @@ sketchybar --default icon.font="SF Pro:Semibold:14.0" \
 
 # ── Left: Workspaces ────────────────────────────────────────
 source $ITEM_DIR/spaces.sh
+source $ITEM_DIR/media.sh
 
 # ── Center-left (q): Clock ───────────────────────────────────
 source $ITEM_DIR/clock.sh
@@ -57,3 +58,5 @@ source $ITEM_DIR/mullvad.sh
 
 # ── Finalize ─────────────────────────────────────────────────
 sketchybar --update
+"$PLUGIN_DIR/media-daemon.sh" >/dev/null 2>&1 &
+"$PLUGIN_DIR/media-daemon-mpd.sh" >/dev/null 2>&1 &
