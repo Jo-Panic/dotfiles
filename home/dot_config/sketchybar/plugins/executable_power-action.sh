@@ -17,7 +17,7 @@ case "$1" in
     osascript -e 'tell application "loginwindow" to «event aevtrrst»'
     ;;
   shutdown)
-    osascript -e 'tell application "loginwindow" to «event aevtsdwn»'
+    osascript -e 'tell application "loginwindow" to «event aevtrsdn»'
     ;;
   *)
     echo "Usage: $0 {suspend|restart|shutdown}" >&2
