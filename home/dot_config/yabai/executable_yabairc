@@ -60,3 +60,8 @@ yabai -m rule --add app="^Firefox$" space=^6
 yabai -m rule --add app="^Mullvad Browser$" space=^7
 yabai -m rule --add app="^Tor Browser$" space=^7
 
+# Firefox hors VPN → bordure rouge = IP réelle exposée
+# (même bundle que Firefox : identifié par borders-novpn, pas par une règle)
+yabai -m signal --add label=novpn_border_created event=window_created action="$HOME/.local/bin/borders-novpn created"
+yabai -m signal --add label=novpn_border_focused event=window_focused action="$HOME/.local/bin/borders-novpn"
+

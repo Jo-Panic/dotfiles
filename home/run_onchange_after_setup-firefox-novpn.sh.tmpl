@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Firefox hors VPN : cf. ~/.local/bin/firefox-novpn-setup
+#
+# Re-run quand un fichier canonique change :
+# firefox-novpn-setup  : {{ include "dot_local/bin/executable_firefox-novpn-setup" | sha256sum }}
+# user.js              : {{ include "dot_config/firefox/user.js" | sha256sum }}
+# userChrome.css       : {{ include "dot_config/firefox/chrome/userChrome.css" | sha256sum }}
+# userChrome-novpn.css : {{ include "dot_config/firefox/chrome/userChrome-novpn.css" | sha256sum }}
+# Info.plist lanceur   : {{ include "Applications/Firefox (hors VPN).app/Contents/Info.plist" | sha256sum }}
+
+# Un échec ne bloque pas chezmoi apply : le lanceur relance le setup
+# lui-même si un prérequis manque.
+"$HOME/.local/bin/firefox-novpn-setup" ||
+  echo "⚠ firefox-novpn-setup a échoué : le relancer à la main pour le détail." >&2

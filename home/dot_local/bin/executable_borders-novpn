@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# ~/.local/bin/borders-novpn
+#
+# Bordure rouge sur les fenêtres de « Firefox (hors VPN) » : équivalent
+# de la règle Hyprland firefox-novpn-warning (arch-dotfiles, windows.lua).
+#
+# Les deux instances de Firefox partagent le même bundle
+# (org.mozilla.firefox) : ni les règles yabai ni les options globales de
+# borders ne les distinguent. L'instance hors VPN est donc reconnue à sa
+# ligne de commande (--no-remote -P novpn), puis chacune de ses fenêtres
+# reçoit une surcharge propre :  borders apply-to=<id fenêtre> …
+# (les id yabai sont les CGWindowID qu'utilise borders).
+#
+# Appelé par les signaux yabai (cf. yabairc) :
+#   window_created → borders-novpn created
+#       avec ré-essais : borders peut ne pas encore suivre la fenêtre
+#       quand yabai la signale, et ignore alors la surcharge.
+#   window_focused → borders-novpn
+#       rattrapage : création manquée, redémarrage de borders…
+
+set -uo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+
+RED=0xfff38ba8 # Catppuccin red, comme rgb(f38ba8) côté Hyprland
+
+# Signature de l'instance hors VPN : identique dans le lanceur.
+MATCH='MacOS/firefox --no-remote -P novpn'
+
+WID="${YABAI_WINDOW_ID:-}"
+[[ -n $WID ]] || exit 0
+
+# Sortie rapide, le cas courant à chaque focus : pas d'instance hors VPN.
+novpn_pids=$(pgrep -f -- "$MATCH") || exit 0
+
+# Ne jamais appeler borders s'il ne tourne pas : « borders <options> »
+# démarrerait un nouveau serveur au lieu de mettre à jour l'existant.
+pgrep -x borders >/dev/null || exit 0
+
+pid=$(yabai -m query --windows --window "$WID" 2>/dev/null | jq -r '.pid // empty')
+[[ -n $pid ]] && grep -qx "$pid" <<<"$novpn_pids" || exit 0
+
+paint() {
+  borders apply-to="$WID" active_color="$RED" inactive_color="$RED" >/dev/null 2>&1
+}
+
+if [[ ${1:-} == created ]]; then
+  paint
+  sleep 0.3
+  paint
+  sleep 1
+  paint
+else
+  paint
+fi

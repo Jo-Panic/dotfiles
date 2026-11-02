@@ -1,0 +1,19 @@
+/* ── Profil novpn : Firefox hors tunnel Mullvad (IP réelle exposée) ──
+   Concaténé après userChrome.css par firefox-novpn-setup, uniquement
+   dans le profil novpn. Pas de @namespace ici : celui de userChrome.css
+   le précède déjà. Complète la bordure rouge posée par borders-novpn. */
+
+/* Barre d'outils teintée de rouge */
+#nav-bar {
+  background-color: color-mix(in srgb, #f38ba8 22%, var(--toolbar-bgcolor)) !important;
+}
+
+/* Liseré rouge en haut de la fenêtre */
+#navigator-toolbox {
+  border-top: 3px solid #f38ba8 !important;
+}
+
+/* Barre d'adresse cerclée de rouge */
+#urlbar-background {
+  outline: 1px solid #f38ba8 !important;
+}

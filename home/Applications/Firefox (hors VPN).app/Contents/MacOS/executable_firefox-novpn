@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# ~/Applications/Firefox (hors VPN).app/Contents/MacOS/firefox-novpn
+#
+# Lanceur Spotlight de Firefox hors du tunnel Mullvad (IP réelle exposée),
+# pour les sites qui bloquent le VPN. Équivalent macOS de
+# firefox-novpn.desktop (arch-dotfiles) :
+#
+#   mullvad-exclude firefox --no-remote -P novpn
+#
+# Points propres à macOS :
+#   - Firefox est lancé en exécutant directement son binaire, jamais via
+#     open : open passe par launchd, Firefox ne serait plus un enfant de
+#     mullvad-exclude et perdrait l'exclusion.
+#   - Le lanceur rend la main aussitôt (Firefox en arrière-plan). Un exec
+#     ferait hériter Firefox du LSUIElement du lanceur (ni Dock ni menu).
+#   - Prérequis manquants → firefox-novpn-setup est lancé une fois pour
+#     les réparer, sinon une alerte explique quoi faire.
+#
+# Repère visuel : bordure rouge posée par borders-novpn (signaux yabai)
+# et barre d'outils teintée (userChrome-novpn.css).
+
+set -uo pipefail
+
+# PATH explicite : LaunchServices lance avec un PATH minimal.
+# yabai et jq sont sous /opt/homebrew/bin sur Apple Silicon.
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+
+FIREFOX="/Applications/Firefox.app/Contents/MacOS/firefox"
+EXCLUDE="$HOME/.local/bin/mullvad-exclude"
+SETUP="$HOME/.local/bin/firefox-novpn-setup"
+MULLVAD="/usr/local/bin/mullvad"
+PROFILES="$HOME/Library/Application Support/Firefox/Profiles"
+
+# Signature de l'instance hors VPN dans la table des processus.
+# Doit rester identique dans borders-novpn.
+MATCH='MacOS/firefox --no-remote -P novpn'
+
+alert() {
+  osascript -e 'on run argv' \
+    -e 'display alert "Firefox (hors VPN)" message (item 1 of argv) as critical' \
+    -e 'end run' "$1" >/dev/null 2>&1
+}
+
+notify() {
+  osascript -e 'on run argv' \
+    -e 'display notification (item 1 of argv) with title "Firefox (hors VPN)"' \
+    -e 'end run' "$1" >/dev/null 2>&1
+}
+
+# ── 1. Déjà lancé → focus de sa fenêtre ──────────────────────
+# --no-remote interdit d'ouvrir une 2e instance sur le même profil.
+pid=$(pgrep -f -- "$MATCH" | head -n1)
+if [[ -n $pid ]]; then
+  wid=$(yabai -m query --windows 2>/dev/null |
+    jq -r --argjson p "$pid" 'map(select(.pid == $p)) | first | .id // empty')
+  if [[ -n ${wid:-} ]]; then
+    yabai -m window --focus "$wid" 2>/dev/null || true
+  else
+    notify "Déjà ouvert, sans fenêtre : ⌘N dans cette instance."
+  fi
+  exit 0
+fi
+
+# ── 2. Prérequis ─────────────────────────────────────────────
+[[ -x $FIREFOX ]] || {
+  alert "Firefox introuvable : $FIREFOX"
+  exit 1
+}
+
+ready() {
+  local st
+  [[ -x $EXCLUDE ]] || return 1
+  compgen -G "$PROFILES/*.novpn" >/dev/null || return 1
+  st=$("$MULLVAD" split-tunnel get 2>/dev/null) || return 1
+  grep -qi 'state: on' <<<"$st" && grep -qxF "$EXCLUDE" <<<"$st"
+}
+
+if ! ready; then
+  "$SETUP" >/dev/null 2>&1
+  ready || {
+    alert "Configuration incomplète (split tunneling Mullvad, profil novpn ou mullvad-exclude). Lancer firefox-novpn-setup dans un terminal pour le détail."
+    exit 1
+  }
+fi
+
+# ── 3. Pré-focus du space de Firefox ─────────────────────────
+# Même logique que wm-launch-app (race condition borders/yabai au
+# cold-start) : la règle yabai ^Firefox$ s'applique aux deux instances.
+space=$(yabai -m rule --list 2>/dev/null |
+  jq -r '.[] | select(.app == "^Firefox$") | .space // empty' | head -n1)
+if [[ -n ${space:-} ]]; then
+  yabai -m space --focus "$space" 2>/dev/null || true
+fi
+
+# ── 4. Lancement hors tunnel ─────────────────────────────────
+"$EXCLUDE" "$FIREFOX" --no-remote -P novpn >/dev/null 2>&1 &
+disown

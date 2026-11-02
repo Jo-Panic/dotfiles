@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# ~/.local/bin/firefox-novpn-setup
+#
+# Prépare « Firefox (hors VPN) », équivalent macOS de firefox-novpn.desktop
+# (arch-dotfiles). Idempotent : relançable à volonté pour tout réparer.
+#
+#   1. ~/.local/bin/mullvad-exclude = copie de /usr/bin/env
+#      Sur macOS, Mullvad exclut par chemin exact d'exécutable, et
+#      l'exclusion se transmet aux processus enfants, y compris à travers
+#      exec. Exclure cette copie donne l'équivalent du mullvad-exclude
+#      Linux :  mullvad-exclude <commande> [args…]
+#      Un script ne conviendrait pas : pour un script, macOS déclare
+#      l'interpréteur (/bin/bash) comme exécutable.
+#   2. Profil Firefox « novpn »
+#   3. Préférences du profil : user.js commun, userChrome.css commun
+#      suivi de la surcouche userChrome-novpn.css
+#   4. Icône du lanceur ~/Applications/Firefox (hors VPN).app
+#   5. Mullvad : exclusion de mullvad-exclude + split tunneling actif
+#      (Mullvad doit avoir l'Accès complet au disque, cf. Réglages
+#      Système → Confidentialité et sécurité)
+#
+# Appelé par run_onchange_after_setup-firefox-novpn.sh (chezmoi apply) et
+# par le lanceur quand un prérequis manque.
+
+set -euo pipefail
+
+FIREFOX_APP="/Applications/Firefox.app"
+FIREFOX="$FIREFOX_APP/Contents/MacOS/firefox"
+EXCLUDE="$HOME/.local/bin/mullvad-exclude"
+MULLVAD="/usr/local/bin/mullvad"
+FF="$HOME/Library/Application Support/Firefox"
+LAUNCHER="$HOME/Applications/Firefox (hors VPN).app"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+
+USERJS="$HOME/.config/firefox/user.js"
+USERCHROME="$HOME/.config/firefox/chrome/userChrome.css"
+USERCHROME_NOVPN="$HOME/.config/firefox/chrome/userChrome-novpn.css"
+
+echo "Firefox hors VPN…"
+
+[[ -x $FIREFOX ]] || {
+  echo "  ✗ Firefox introuvable ($FIREFOX_APP) : brew install --cask firefox" >&2
+  exit 1
+}
+
+# ── 1. mullvad-exclude ───────────────────────────────────────
+mkdir -p "$(dirname "$EXCLUDE")"
+if ! cmp -s /usr/bin/env "$EXCLUDE"; then
+  install -m 755 /usr/bin/env "$EXCLUDE"
+  echo "  → $EXCLUDE (copie de /usr/bin/env)"
+fi
+
+# ── 2. Profil novpn ──────────────────────────────────────────
+if ! compgen -G "$FF/Profiles/*.novpn" >/dev/null; then
+  "$FIREFOX" -CreateProfile novpn >/dev/null
+  echo "  → profil novpn créé"
+fi
+
+# ── 3. Préférences du profil ─────────────────────────────────
+# Le profil novpn échappe à run_onchange_after_deploy-firefox-prefs
+# (qui ne cible que *.default-release et *.default) : déployé ici.
+for p in "$FF"/Profiles/*.novpn; do
+  [[ -d $p ]] || continue
+  cp "$USERJS" "$p/user.js"
+  mkdir -p "$p/chrome"
+  cat "$USERCHROME" "$USERCHROME_NOVPN" >"$p/chrome/userChrome.css"
+  echo "  → $p"
+done
+
+# ── 4. Icône du lanceur ──────────────────────────────────────
+if [[ -d $LAUNCHER ]]; then
+  icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' \
+    "$FIREFOX_APP/Contents/Info.plist" 2>/dev/null || echo firefox)
+  src="$FIREFOX_APP/Contents/Resources/${icon%.icns}.icns"
+  if [[ -f $src ]]; then
+    mkdir -p "$LAUNCHER/Contents/Resources"
+    if ! cmp -s "$src" "$LAUNCHER/Contents/Resources/firefox-novpn.icns"; then
+      cp "$src" "$LAUNCHER/Contents/Resources/firefox-novpn.icns"
+      touch "$LAUNCHER"
+      echo "  → icône du lanceur"
+    fi
+    # Enregistrement LaunchServices : Spotlight le propose aussitôt
+    "$LSREGISTER" -f "$LAUNCHER" 2>/dev/null || true
+  else
+    echo "  ⚠ icône de Firefox introuvable ($src)" >&2
+  fi
+fi
+
+# ── 5. Mullvad ───────────────────────────────────────────────
+[[ -x $MULLVAD ]] || {
+  echo "  ✗ CLI mullvad introuvable ($MULLVAD) : brew install --cask mullvad-vpn" >&2
+  exit 1
+}
+
+st=$("$MULLVAD" split-tunnel get)
+if ! grep -qxF "$EXCLUDE" <<<"$st"; then
+  "$MULLVAD" split-tunnel app add "$EXCLUDE" >/dev/null
+  echo "  → $EXCLUDE exclu du tunnel"
+fi
+if ! grep -qi 'state: on' <<<"$st"; then
+  "$MULLVAD" split-tunnel set on >/dev/null
+  echo "  → split tunneling activé"
+fi
+
+echo "Terminé."
