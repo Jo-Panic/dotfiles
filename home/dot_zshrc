@@ -66,10 +66,19 @@ ZSH_THEME="pulsar"
 # Would you like to use another custom folder than $ZSH/custom?
 # ZSH_CUSTOM=/path/to/new-custom-folder
 
+# fnm (Node.js version manager)
+eval "$(fnm env --use-on-cd)"
+
 # Which plugins would you like to load? Standard plugins can be found in $ZSH/plugins/ Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git zsh-autosuggestions zsh-syntax-highlighting web-search)
+
+# Cache de complétion sous ~/.cache plutôt qu'à la racine du $HOME.
+# Doit être posé AVANT le source : compinit est appelé depuis oh-my-zsh.sh,
+# donc avant la lecture de $ZSH_CUSTOM/*.zsh (env.zsh arriverait trop tard).
+ZSH_COMPDUMP="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump-${HOST%%.*}-${ZSH_VERSION}"
+[[ -d ${ZSH_COMPDUMP:h} ]] || mkdir -p ${ZSH_COMPDUMP:h}
 
 source $ZSH/oh-my-zsh.sh
 
@@ -105,19 +114,26 @@ fi
 # Path for ~/.local/bin
 export PATH="$PATH:$HOME/.local/bin"
 
-# Set history parameters
-SAVEHIST=1000
-HISTSIZE=999
-setopt share_history
-setopt hist_expire_dups_first
-setopt hist_ignore_dups
-setopt hist_verify
+# Historique — lib/history.zsh (Oh My Zsh) fixe un plancher 50000/10000 et pose
+# extended_history, hist_expire_dups_first, hist_ignore_dups, hist_ignore_space,
+# hist_verify, share_history. Ces lignes étant APRÈS le source, elles priment :
+# ne relever que les bornes, et n'ajouter que ce que la lib ne couvre pas.
+HISTSIZE=100000            # liste en mémoire — doit rester > SAVEHIST
+SAVEHIST=50000             # entrées conservées dans $HISTFILE
+setopt hist_reduce_blanks  # normalise les espaces avant enregistrement
+setopt hist_fcntl_lock     # verrou fcntl (FS local ; à retirer sur NFS)
 
 # Set up fzf key bindings and fuzzy completion
 source <(fzf --zsh)
 
 # Ctrl+f pour ouvrir une session tmux avec ~/.local/bin/tmux-sessionizer.sh
-bindkey -s ^f "tmux-sessionizer.sh\n"
+# Widget ZLE (et non bindkey -s) : la commande n'est ni écrite dans le prompt, ni ajoutée à l'historique
+tmux-sessionizer-widget() {
+  tmux-sessionizer.sh < /dev/tty
+  zle reset-prompt
+}
+zle -N tmux-sessionizer-widget
+bindkey '^f' tmux-sessionizer-widget
 
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
@@ -146,7 +162,3 @@ function y() {
 	fi
 	rm -f -- "$tmp"
 }
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
-[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion

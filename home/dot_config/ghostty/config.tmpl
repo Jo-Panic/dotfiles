@@ -1,6 +1,5 @@
 # Fonts
 font-size = 16
-font-feature = "calt 1, liga 1"
 
 # Theme
 theme = "Catppuccin Mocha"
@@ -9,7 +8,6 @@ theme = "Catppuccin Mocha"
 shell-integration-features = no-cursor
 cursor-style = "block"
 cursor-style-blink = "true"
-adjust-cursor-height = -4
 
 # Mouse
 mouse-hide-while-typing
@@ -29,7 +27,8 @@ window-colorspace = "display-p3"
 # Command to execute
 # close ghostty when last window is closed
 quit-after-last-window-closed = true
+{{- end }}
+
 # launch tmux with a default session called other.
 # Using tmux-sessionizer.sh : if other session allready exists it automatically attach to it
 command = zsh --login -c "if command -v tmux >/dev/null 2>&1 && [ -x ~/.local/bin/tmux-sessionizer.sh ]; then ~/.local/bin/tmux-sessionizer.sh other; else zsh; fi"
-{{- end }}
