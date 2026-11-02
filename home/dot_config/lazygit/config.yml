@@ -1,0 +1,32 @@
+# Pull requests GitHub via gh, sans navigateur : menu X du panneau Branches.
+# Raccourcis natifs (o, O, G) inchangés.
+customCommands:
+  - key: X
+    description: "Pull requests (gh)"
+    commandMenu:
+      - key: c
+        context: localBranches
+        description: "Créer la PR (titre et description tirés des commits)"
+        command: "gh pr create --fill --head {{.SelectedLocalBranch.Name | quote}}"
+        output: log
+        loadingText: "Création de la PR"
+      - key: m
+        context: localBranches
+        description: "Merger la PR, supprimer la branche, revenir sur main"
+        prompts:
+          - type: menu
+            title: "Méthode de merge"
+            key: Method
+            options:
+              - name: squash
+                description: "un seul commit sur main"
+                value: squash
+              - name: merge
+                description: "commit de merge, historique conservé"
+                value: merge
+              - name: rebase
+                description: "commits rejoués sur main"
+                value: rebase
+        command: "gh pr merge {{.SelectedLocalBranch.Name | quote}} --{{.Form.Method}} --delete-branch"
+        output: log
+        loadingText: "Merge de la PR"
