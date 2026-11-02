@@ -28,3 +28,10 @@ image_filter = "triangle"
 image_quality = 75
 ueberzug_scale = 1
 ueberzug_offset = [0, 0, 0, 0]
+
+[opener]
+video = [{ run = 'mpv %s', desc = "Lire avec mpv", orphan = true }]
+exif = [{ run = 'exiftool -G1 %s | less', block = true, desc = "Métadonnées (exiftool)" }]
+
+[open]
+prepend_rules = [{ mime = "video/*", use = ["video", "exif"] }]
