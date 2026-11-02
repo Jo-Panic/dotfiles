@@ -1,0 +1,390 @@
+#!/usr/bin/env bash
+# conv — Conversions courantes : images, vidéos, audio, PDF.
+#
+# Usage :
+#   conv <fichier>…               menu fzf des conversions applicables
+#   conv -p <preset> <fichier>…   conversion directe (scriptable)
+#   conv -l                       liste des presets
+#   conv --presets <fichier>…     presets applicables, en TSV (plugin yazi)
+#
+# Le plugin yazi conv.yazi (E puis c) ne fait qu'appeler ce script :
+# ajouter un preset revient à modifier ce seul fichier.
+#
+# Règles communes :
+#   - résultat écrit à côté de l'original, jamais modifié ;
+#   - aucun fichier existant écrasé : suffixe -1, -2… si le nom est pris ;
+#   - écriture dans un temporaire caché (.conv.*) puis renommage : une
+#     conversion interrompue ne laisse pas de fichier final tronqué ;
+#   - type reconnu par l'extension, sans tenir compte de la casse ;
+#   - fichier incompatible avec le preset : ignoré et compté dans le bilan.
+#
+# Sortie : une ligne par fichier, puis le bilan en dernière ligne (repris
+# par la notification du plugin). Code retour 1 si au moins une erreur.
+
+set -uo pipefail
+
+# ── Réglages ──────────────────────────────────────────────────
+JPG_QUALITY=90      # j : → JPG
+SHARE_MAX=2048      # s : côté long maximal (px)
+SHARE_QUALITY=85    # s : qualité JPG
+PDF_MAX=2339        # d : côté long maximal (px), soit A4 à 200 dpi
+PDF_DPI=200         # d : densité déclarée des pages
+PAGES_DPI=150       # i : résolution du rendu PDF → PNG
+X264_CRF=20         # m : qualité vidéo (plus bas = meilleur)
+X264_PRESET=medium  # m : compromis vitesse / taille
+AAC_BITRATE=160k    # m : piste audio
+MP3_QUALITY=2       # a : VBR LAME (0 = meilleur ; 2 ≈ 190 kb/s)
+SRGB_ICC=/usr/share/argyllcms/ref/sRGB.icm # s, d : profil cible (argyllcms)
+
+# Extensions reconnues, en minuscules
+IMAGE_EXT=" jpg jpeg png heic heif avif webp tif tiff bmp gif jxl "
+VIDEO_EXT=" mp4 m4v mov mkv webm avi wmv mts m2ts 3gp "
+AUDIO_EXT=" mp3 flac wav m4a aac ogg oga opus wma aiff aif "
+
+# Presets, dans l'ordre du menu : touche|identifiant|libellé
+PRESETS=(
+  "j|jpg|→ JPG (qualité ${JPG_QUALITY}, EXIF et profil couleur conservés)"
+  "p|png|→ PNG (sans perte)"
+  "s|partage|→ JPG partage (${SHARE_MAX} px, sRGB, sans métadonnées)"
+  "d|pdf|Images → un seul PDF"
+  "m|mp4|→ MP4 H.264/AAC (HDR ramené en SDR)"
+  "a|mp3|→ MP3 (extrait l'audio d'une vidéo)"
+  "i|pages|PDF → une image PNG par page"
+)
+
+# ── Utilitaires ───────────────────────────────────────────────
+die() {
+  echo "conv : $*" >&2
+  exit 2
+}
+
+usage() {
+  cat <<'EOF2'
+Usage :
+  conv <fichier>…               menu fzf des conversions applicables
+  conv -p <preset> <fichier>…   conversion directe
+  conv -l                       liste des presets
+EOF2
+  exit "${1:-2}"
+}
+
+# ── Compatibilité macOS ───────────────────────────────────────
+# Le script suppose bash ≥ 4.4 (mapfile -d) et les outils GNU (mktemp
+# --suffix, mv -T, realpath -sm, sort -zV). macOS livre bash 3.2 et des
+# outils BSD : on y prend bash et coreutils de Homebrew, ffmpeg-full s'il
+# est installé (le ffmpeg de base n'a pas zscale, requis pour le HDR), et
+# le profil sRGB du système à la place d'argyllcms. Sans effet sous Linux.
+((BASH_VERSINFO[0] * 100 + BASH_VERSINFO[1] >= 404)) ||
+  die "bash ≥ 4.4 requis, $BASH_VERSION trouvé (macOS : brew install bash)"
+if [[ $OSTYPE == darwin* ]]; then
+  BREW=${HOMEBREW_PREFIX:-/opt/homebrew}
+  [[ -d $BREW/opt/coreutils/libexec/gnubin ]] ||
+    die "coreutils GNU introuvable (brew install coreutils)"
+  PATH="$BREW/opt/coreutils/libexec/gnubin:$PATH"
+  [[ -d $BREW/opt/ffmpeg-full/bin ]] && PATH="$BREW/opt/ffmpeg-full/bin:$PATH"
+  SRGB_ICC="/System/Library/ColorSync/Profiles/sRGB Profile.icc"
+fi
+
+TMP=""
+cleanup() { [[ -n $TMP ]] && rm -rf -- "$TMP"; }
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+STATS=(-nostats)
+[[ -t 2 ]] && STATS=(-stats)
+
+ext_of() {
+  local base=${1##*/}
+  [[ $base == *.* ]] && printf '%s\n' "${base##*.}" | tr '[:upper:]' '[:lower:]'
+}
+
+kind_of() {
+  local ext
+  ext=$(ext_of "$1")
+  [[ -n $ext ]] || return 0
+  if [[ $IMAGE_EXT == *" $ext "* ]]; then
+    echo image
+  elif [[ $VIDEO_EXT == *" $ext "* ]]; then
+    echo video
+  elif [[ $AUDIO_EXT == *" $ext "* ]]; then
+    echo audio
+  elif [[ $ext == pdf ]]; then
+    echo pdf
+  fi
+}
+
+# accepts <preset> <fichier> : vrai si le preset s'applique au fichier
+accepts() {
+  local f=$2 kind ext
+  [[ -f $f ]] || return 1
+  kind=$(kind_of "$f")
+  ext=$(ext_of "$f")
+  case $1 in
+  jpg) [[ $kind == image && $ext != jpg && $ext != jpeg ]] ;;
+  png) [[ $kind == image && $ext != png ]] ;;
+  partage | pdf) [[ $kind == image ]] ;;
+  mp4) [[ $kind == video ]] ;;
+  mp3) [[ $kind == video || ($kind == audio && $ext != mp3) ]] ;;
+  pages) [[ $kind == pdf ]] ;;
+  *) return 1 ;;
+  esac
+}
+
+# unique <dossier> <nom> <extension> : premier chemin libre (ext vide = dossier)
+unique() {
+  local path="$1/$2$3" n=1
+  while [[ -e $path ]]; do
+    path="$1/$2-$n$3"
+    n=$((n + 1))
+  done
+  printf '%s\n' "$path"
+}
+
+# commit <dossier> <nom> <extension> : renomme le temporaire sans jamais écraser
+commit() {
+  local dest
+  dest=$(unique "$1" "$2" "$3")
+  mv -nT -- "$TMP" "$dest" 2>/dev/null
+  [[ -e $TMP ]] && return 1
+  TMP=""
+  DEST=${dest##*/}
+}
+
+require() {
+  local c
+  for c in "$@"; do
+    command -v "$c" >/dev/null || die "$c introuvable"
+  done
+}
+
+# ── Conversions (lisent $1, écrivent dans $TMP) ───────────────
+# [0] : première image seulement (HEIC multi-images, GIF animé, TIFF multipage)
+to_jpg() {
+  magick "$1[0]" -auto-orient -background white -alpha remove -alpha off \
+    -quality "$JPG_QUALITY" "$TMP"
+}
+
+to_png() {
+  magick "$1[0]" -auto-orient "$TMP"
+}
+
+# Conversion vers sRGB avant -strip : retirer le profil seul désaturerait
+# une image Display P3. Sans profil embarqué, -profile assigne sRGB.
+to_partage() {
+  magick "$1[0]" -auto-orient -background white -alpha remove -alpha off \
+    -profile "$SRGB_ICC" -resize "${SHARE_MAX}x${SHARE_MAX}>" -strip \
+    -quality "$SHARE_QUALITY" "$TMP"
+}
+
+# HDR (PQ ou HLG, cas des vidéos d'iPhone) : tone mapping vers SDR BT.709,
+# sinon image délavée en H.264 8 bits. Dimensions paires exigées par libx264.
+to_mp4() {
+  local vf="scale=trunc(iw/2)*2:trunc(ih/2)*2" tags=() trc
+  trc=$(ffprobe -v error -select_streams v:0 -show_entries stream=color_transfer \
+    -of csv=p=0 "$1")
+  case $trc in
+  smpte2084 | arib-std-b67)
+    vf+=",zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709"
+    vf+=",tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv"
+    tags=(-color_primaries bt709 -color_trc bt709 -colorspace bt709)
+    NOTE=" (HDR → SDR)"
+    ;;
+  esac
+  ffmpeg -nostdin -hide_banner -loglevel error "${STATS[@]}" -y -i "$1" \
+    -map 0:v:0 -map '0:a:0?' -vf "$vf" \
+    -c:v libx264 -preset "$X264_PRESET" -crf "$X264_CRF" -pix_fmt yuv420p "${tags[@]}" \
+    -c:a aac -b:a "$AAC_BITRATE" -movflags +faststart "$TMP"
+}
+
+to_mp3() {
+  if [[ -z $(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$1") ]]; then
+    REASON="aucune piste audio"
+    return 3
+  fi
+  ffmpeg -nostdin -hide_banner -loglevel error "${STATS[@]}" -y -i "$1" \
+    -map 0:a:0 -c:a libmp3lame -q:a "$MP3_QUALITY" "$TMP"
+}
+
+# $TMP est ici un dossier ; pdftoppm numérote les pages <nom>-1.png…
+to_pages() {
+  pdftoppm -png -r "$PAGES_DPI" "$1" "$TMP/$2"
+}
+
+# ── Exécution ─────────────────────────────────────────────────
+OK=0 SKIP=0 ERR=0
+
+skip() {
+  echo "– ${1##*/} : ignoré (${2})"
+  SKIP=$((SKIP + 1))
+}
+
+fail() {
+  echo "✗ ${1##*/} : échec${2:+ (${2})}"
+  ERR=$((ERR + 1))
+}
+
+# Un fichier en entrée, un résultat en sortie
+convert_one() {
+  local preset=$1 in=$2 dir base stem ext rc
+  dir=${in%/*} base=${in##*/} stem=${base%.*}
+  NOTE="" REASON=""
+  case $preset in
+  jpg | partage) ext=.jpg ;;
+  png) ext=.png ;;
+  mp4) ext=.mp4 ;;
+  mp3) ext=.mp3 ;;
+  pages) ext="" ;;
+  esac
+  [[ $preset == partage ]] && stem+=_partage
+  [[ $preset == mp4 && $(ext_of "$in") == mp4 ]] && stem+=_h264
+  [[ $preset == pages ]] && stem+=-pages
+
+  if [[ -n $ext ]]; then
+    TMP=$(mktemp -p "$dir" --suffix="$ext" .conv.XXXXXX 2>/dev/null)
+  else
+    TMP=$(mktemp -d -p "$dir" .conv.XXXXXX 2>/dev/null)
+  fi
+  [[ -n $TMP ]] || {
+    fail "$in" "dossier non inscriptible"
+    return
+  }
+
+  "to_$preset" "$in" "${base%.*}"
+  rc=$?
+  if ((rc == 0)) && commit "$dir" "$stem" "$ext"; then
+    echo "✓ $base → $DEST$NOTE"
+    OK=$((OK + 1))
+    return
+  fi
+  rm -rf -- "$TMP"
+  TMP=""
+  case $rc in
+  0) fail "$in" "renommage impossible" ;;
+  3) skip "$in" "$REASON" ;;
+  *) fail "$in" ;;
+  esac
+}
+
+# Plusieurs images en entrée, un seul PDF en sortie (ordre : tri par nom)
+convert_pdf() {
+  local imgs=() f first dir stem n
+  for f in "$@"; do
+    if accepts pdf "$f"; then imgs+=("$f"); else skip "$f" "type incompatible"; fi
+  done
+  ((${#imgs[@]})) || return
+  mapfile -d '' -t imgs < <(printf '%s\0' "${imgs[@]}" | sort -zV)
+
+  n=${#imgs[@]} first=${imgs[0]}
+  dir=${first%/*} stem=${first##*/}
+  stem=${stem%.*}
+  ((n > 1)) && stem+="-${n}pages"
+
+  TMP=$(mktemp -p "$dir" --suffix=.pdf .conv.XXXXXX 2>/dev/null) || {
+    fail "$first" "dossier non inscriptible"
+    return
+  }
+  if magick "${imgs[@]/%/[0]}" -auto-orient -background white -alpha remove -alpha off \
+    -profile "$SRGB_ICC" -resize "${PDF_MAX}x${PDF_MAX}>" -strip \
+    -units PixelsPerInch -density "$PDF_DPI" -compress jpeg -quality "$JPG_QUALITY" "$TMP" &&
+    commit "$dir" "$stem" .pdf; then
+    echo "✓ $n image(s) → $DEST"
+    OK=$((OK + 1))
+  else
+    fail "$first" "PDF non créé"
+  fi
+}
+
+# Presets applicables à au moins un fichier, en TSV : touche, id, libellé
+applicable() {
+  local entry key id label f
+  for entry in "${PRESETS[@]}"; do
+    IFS='|' read -r key id label <<<"$entry"
+    for f in "$@"; do
+      if accepts "$id" "$f"; then
+        printf '%s\t%s\t%s\n' "$key" "$id" "$label"
+        break
+      fi
+    done
+  done
+}
+
+# ── Arguments ─────────────────────────────────────────────────
+preset="" mode=run
+while (($#)); do
+  case $1 in
+  -p)
+    (($# >= 2)) || usage
+    preset=$2
+    shift 2
+    ;;
+  -l | --list)
+    mode=list
+    shift
+    ;;
+  --presets)
+    mode=presets
+    shift
+    ;;
+  -h | --help) usage 0 ;;
+  --)
+    shift
+    break
+    ;;
+  -*) die "option inconnue : $1" ;;
+  *) break ;;
+  esac
+done
+
+if [[ $mode == list ]]; then
+  for entry in "${PRESETS[@]}"; do
+    IFS='|' read -r key id label <<<"$entry"
+    printf '%s  %-8s %s\n' "$key" "$id" "$label"
+  done
+  exit 0
+fi
+
+(($#)) || usage
+files=()
+for f in "$@"; do files+=("$(realpath -sm -- "$f")"); done
+
+if [[ $mode == presets ]]; then
+  applicable "${files[@]}"
+  exit 0
+fi
+
+# Menu : test sur stderr, pas sur stdin — un processus lancé par Hyprland
+# hérite de /dev/tty1 en entrée (§20.38). Échap : sortie sans rien faire.
+if [[ -z $preset ]]; then
+  [[ -t 2 ]] || die "pas de terminal : préciser le preset avec -p"
+  require fzf
+  preset=$(applicable "${files[@]}" |
+    fzf --delimiter='\t' --with-nth=3 --prompt='Conversion › ' \
+      --header='Entrée : convertir · Échap : quitter' --layout=reverse |
+    cut -f2)
+  [[ -n $preset ]] || exit 0
+fi
+
+case $preset in
+jpg | png | partage | pdf) require magick ;;
+mp4 | mp3) require ffmpeg ffprobe ;;
+pages) require pdftoppm ;;
+*) die "preset inconnu : $preset (conv -l pour la liste)" ;;
+esac
+if [[ $preset == partage || $preset == pdf ]]; then
+  [[ -r $SRGB_ICC ]] || die "profil sRGB introuvable : $SRGB_ICC"
+fi
+
+if [[ $preset == pdf ]]; then
+  convert_pdf "${files[@]}"
+else
+  for f in "${files[@]}"; do
+    if accepts "$preset" "$f"; then
+      convert_one "$preset" "$f"
+    else
+      skip "$f" "type incompatible"
+    fi
+  done
+fi
+
+echo "Bilan : $OK converti(s), $SKIP ignoré(s), $ERR erreur(s)"
+((ERR == 0))
