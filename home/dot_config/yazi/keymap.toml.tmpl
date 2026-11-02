@@ -1,8 +1,20 @@
 [mgr]
 [[mgr.prepend_keymap]]
+on = ["g", "l"]
+run = "cd ~/.local"
+desc = "Cd to ~/.local"
+[[mgr.prepend_keymap]]
+on = ["g", "m"]
+run = "cd ~/mnt/medias"
+desc = "Cd to ~/mnt/medias"
+[[mgr.prepend_keymap]]
 on   = [ "g", "p" ]
 run  = "cd ~/Pictures"
 desc = "Cd to ~/Pictures"
+[[mgr.prepend_keymap]]
+on = ["g", "o"]
+run = "cd ~/Documents"
+desc = "Cd to ~/Documents"
 [[mgr.prepend_keymap]]
 on   = [ "g", "u" ]
 run  = "cd ~/Library/CloudStorage/ProtonDrive-{{ onepasswordRead "op://73pus6uujgs25rkmbu3prdfkha/iq557kdlpp5z4hkbc5y3b7a6wi/e-mail" }}-folder"
@@ -13,5 +25,13 @@ run = "plugin exif-strip"
 desc = "Strip EXIF data from selected files"
 [[mgr.prepend_keymap]]
 on = ["E", "e"]
-run = "shell 'gimp \"$0\"' --orphan"
+run = "shell 'gimp %s' --orphan"
 desc = "Edit image in GIMP"
+[[mgr.prepend_keymap]]
+on = ["E", "p"]
+run = "plugin pdf-compress"
+desc = "Compress PDF (Ghostscript /printer)"
+[[mgr.prepend_keymap]]
+on = ["E", "c"]
+run = "plugin conv"
+desc = "Convert selected files (menu)"
