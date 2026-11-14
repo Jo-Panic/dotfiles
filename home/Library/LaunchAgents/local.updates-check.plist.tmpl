@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Vérification périodique des mises à jour Homebrew.
+  Pendant macOS de updates-check.timer + updates-check.service (Arch).
+
+  Timer   : toutes les 3 h à heure fixe (OnCalendar=*-*-* 00/3:00:00).
+            Les déclenchements manqués pendant la veille sont regroupés en
+            un seul au réveil (équivalent de Persistent=true).
+  Démarrage : une vérification à l'ouverture de session et à chaque
+            rechargement de l'agent (RunAtLoad).
+  Priorité : Background + LowPriorityIO + Nice 19 (Nice=19,
+            IOSchedulingClass=idle).
+  Journal : le script écrit lui-même une ligne par vérification, marquée
+            [agent], dans ~/Library/Logs/updates-check.log ; stderr n'y
+            ajoute que les erreurs inattendues de bash.
+
+  Chargé par run_onchange_after_load-updates-check-agent.sh (chezmoi).
+  État : launchctl print gui/$UID/local.updates-check
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>local.updates-check</string>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>{{ .chezmoi.homeDir }}/.local/bin/updates-check</string>
+		<string>--agent</string>
+	</array>
+
+	<key>StartCalendarInterval</key>
+	<array>
+		<dict><key>Hour</key><integer>0</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>12</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>18</integer><key>Minute</key><integer>0</integer></dict>
+		<dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>0</integer></dict>
+	</array>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>Nice</key>
+	<integer>19</integer>
+
+	<key>StandardOutPath</key>
+	<string>/dev/null</string>
+	<key>StandardErrorPath</key>
+	<string>{{ .chezmoi.homeDir }}/Library/Logs/updates-check.log</string>
+</dict>
+</plist>

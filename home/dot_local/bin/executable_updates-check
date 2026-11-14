@@ -1,0 +1,299 @@
+#!/bin/bash
+# ── updates-check ────────────────────────────────────────────
+# Détecte les mises à jour Homebrew disponibles (formules + casks) et notifie
+# une seule fois par changement de l'ensemble des paquets en attente.
+# Pendant macOS de updates-check sur Arch (checkupdates + AUR).
+#
+# Différence avec Arch : pas de base jetable façon checkupdates. `brew update`
+# rafraîchit le catalogue de Homebrew lui-même, ce qui est sans risque :
+# rien n'est installé, et Homebrew ne connaît pas les mises à jour partielles
+# qui interdisent `pacman -Sy` seul. C'est ce que `brew upgrade` ferait de
+# toute façon avant d'installer.
+#
+# Les formules épinglées (brew pin) sont ignorées : `brew upgrade` les saute,
+# elles resteraient sinon « en attente » indéfiniment.
+#
+# Autre différence : l'état affiché par sketchybar et la notification sont
+# suivis séparément (pending / notified). Un échec de notification ne bloque
+# pas la barre, et la notification est retentée à la vérification suivante.
+#
+# Journal (~/Library/Logs/updates-check.log) : une ligne par vérification,
+# avec son origine (agent ou manuel) et son résultat — l'équivalent des
+# lignes Started/Finished de journald, que launchd ne fournit pas. Sans elle,
+# une vérification qui ne trouve rien de nouveau est invisible.
+#
+# Toute erreur (réseau, VPN, verrou tenu par un autre processus brew) se
+# termine en code 0, sans rien écrire dans l'état — la vérification suivante
+# reprendra. Lancé par l'agent, `brew update` est retenté pendant ~3 min :
+# au démarrage de session et au réveil, le réseau (ou le VPN) n'est souvent
+# pas encore prêt, et launchd n'a pas d'équivalent à network-online.target.
+#
+# Écrit pour le /bin/bash 3.2 de macOS : ni mapfile, ni tableau associatif,
+# ni printf '\U…'.
+#
+# Déclenché par l'agent launchd local.updates-check (toutes les 3 h).
+# Usage manuel : updates-check [--verbose] [--no-update]
+#   --verbose    détaille les paquets et renvoie la notification même si
+#                rien n'a changé (sert aussi à accorder la permission de
+#                notifier, cf. notify())
+#   --no-update  saute `brew update` (fin de session updates-tui.sh, le
+#                catalogue vient d'être rafraîchi)
+#   --agent      réservé à l'agent launchd : journalisé comme tel, `brew
+#                update` retenté
+# ─────────────────────────────────────────────────────────────
+set -uo pipefail
+
+# launchd et sketchybar fournissent un environnement minimal : pas de PATH
+# Homebrew, pas de locale (terminal-notifier reçoit des accents).
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export LANG="${LANG:-fr_FR.UTF-8}"
+export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 HOMEBREW_NO_COLOR=1
+
+# ── Réglages ─────────────────────────────────────────────────
+NOTIFY_MAX_NAMES=5                  # noms listés dans le corps de la notification
+JOURNAL_MAX_NAMES=10                # noms listés dans la ligne de journal
+NOTIFY_GROUP=updates-check          # remplace la notification précédente
+SKETCHYBAR_EVENT=updates_changed    # cf. items/updates.sh
+UPDATE_RETRY_DELAYS="30 60 120"     # secondes entre les essais de brew update (agent)
+TUI="$HOME/.config/sketchybar/plugins/updates-tui.sh"   # clic sur la notification
+STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/updates-check"
+STATE_FILE="$STATE_DIR/pending"     # ce qu'affiche sketchybar
+NOTIFIED_FILE="$STATE_DIR/notified" # dernier ensemble notifié avec succès
+LOG_FILE="$HOME/Library/Logs/updates-check.log"
+LOG_MAX_LINES=1000                  # au-delà du double, le journal est réduit à ce nombre
+NOTIFIER_APP="$HOME/Applications/terminal-notifier.app"
+NOTIFIER="$NOTIFIER_APP/Contents/MacOS/terminal-notifier"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+
+VERBOSE=0
+DO_UPDATE=1
+AGENT=0
+# Boucle sur $# plutôt que "$@" : avec set -u, bash 3.2 tient "$@" vide
+# pour non défini.
+while (($#)); do
+  case $1 in
+  -v | --verbose) VERBOSE=1 ;;
+  --no-update) DO_UPDATE=0 ;;
+  --agent) AGENT=1 ;;
+  *)
+    printf 'usage : %s [--verbose] [--no-update]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+  esac
+  shift
+done
+
+if ((AGENT)); then ORIGIN=agent; else ORIGIN=manuel; fi
+
+log() {
+  ((VERBOSE)) && printf '%s\n' "$*" >&2
+  return 0
+}
+
+# Une ligne horodatée dans le journal, quel que soit l'appelant (agent, clic
+# droit sketchybar, session de mise à jour, terminal) ; recopiée sur stderr
+# dans un terminal.
+journal() {
+  printf '%s [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$ORIGIN" "$*" \
+    >>"$LOG_FILE" 2>/dev/null
+  [[ -t 2 ]] && printf '%s\n' "$*" >&2
+  return 0
+}
+
+# Abandon ou incident : même journal, marqué.
+warn() { journal "⚠ $*"; }
+
+# Garde le journal borné. Réécriture en place (cat >) : le fichier reste le
+# même, le StandardErrorPath de l'agent continue d'y écrire.
+trim_journal() {
+  local lines tmp
+  [[ -f $LOG_FILE ]] || return 0
+  lines=$(awk 'END {print NR}' "$LOG_FILE")
+  ((lines > 2 * LOG_MAX_LINES)) || return 0
+  tmp=$(mktemp) || return 0
+  tail -n "$LOG_MAX_LINES" "$LOG_FILE" >"$tmp" && cat "$tmp" >"$LOG_FILE"
+  rm -f "$tmp"
+}
+
+# Nombre de lignes non vides (wc -l de macOS préfixe des espaces).
+count_lines() { awk 'NF {n++} END {print n + 0}' <<<"$1"; }
+
+# « a, b, c, … » : au plus $2 noms d'une liste (une par ligne)
+join_names() {
+  awk -v max="$2" '
+    NF && n < max {printf "%s%s", (n ? ", " : ""), $0; n++}
+    NF {total++}
+    END {if (total > max) printf ", …"}' <<<"$1"
+}
+
+# « 1 formule », « 3 formules », « 0 cask »
+plural() {
+  if (($1 > 1)); then printf '%s %ss' "$1" "$2"; else printf '%s %s' "$1" "$2"; fi
+}
+
+read_file() { [[ -r $1 ]] && cat "$1"; return 0; }
+
+# brew update, retenté par l'agent si le réseau n'est pas encore là.
+# En cas d'échec final, la dernière ligne d'erreur est dans UPDATE_ERROR.
+UPDATE_ERROR=""
+UPDATE_TRIES=0
+update_catalog() {
+  local out delay
+  UPDATE_TRIES=1
+  out=$(brew update --quiet 2>&1) && return 0
+  if ((AGENT)); then
+    for delay in $UPDATE_RETRY_DELAYS; do
+      sleep "$delay"
+      UPDATE_TRIES=$((UPDATE_TRIES + 1))
+      out=$(brew update --quiet 2>&1) && return 0
+    done
+  fi
+  UPDATE_ERROR=$(printf '%s\n' "$out" | awk 'NF' | tail -n 1)
+  return 1
+}
+
+# ── terminal-notifier ────────────────────────────────────────
+# Depuis la 3.0, terminal-notifier passe par le framework UserNotifications :
+# macOS demande la permission une fois, puis l'app apparaît dans Réglages >
+# Notifications. Mais il ne le fait pas pour une app restée dans le Cellar
+# Homebrew (aucune demande, refus code 3, absente des Réglages). On en tient
+# donc une copie dans ~/Applications, déclarée à LaunchServices, et
+# resynchronisée quand Homebrew met terminal-notifier à jour.
+sync_notifier_app() {
+  local src
+  src="$(brew --prefix)/opt/terminal-notifier/terminal-notifier.app"
+  [[ -d $src ]] || return 1
+  if ! cmp -s "$src/Contents/Info.plist" "$NOTIFIER_APP/Contents/Info.plist"; then
+    mkdir -p "${NOTIFIER_APP%/*}" || return 1
+    rm -rf "$NOTIFIER_APP" && ditto "$src" "$NOTIFIER_APP" || return 1
+    "$LSREGISTER" -f "$NOTIFIER_APP" >/dev/null 2>&1
+    journal "terminal-notifier.app copiée dans ~/Applications"
+  fi
+  [[ -x $NOTIFIER ]]
+}
+
+notifier_reason() {
+  case $1 in
+  1 | 2) echo "argument refusé" ;;
+  3) echo "notifications non autorisées" ;;
+  4) echo "pas de session graphique" ;;
+  5) echo "refus du centre de notifications" ;;
+  *) echo "code $1" ;;
+  esac
+}
+
+# terminal-notifier si installé (brew install terminal-notifier) :
+# regroupement (-group, comme le stack-tag de dunst) et clic qui ouvre la
+# session de mise à jour. Sinon, ou s'il échoue : notification AppleScript
+# (attribuée à « Éditeur de script », clic sans effet utile).
+notify() {
+  local rc
+  if sync_notifier_app; then
+    "$NOTIFIER" \
+      -title "$1" \
+      -message "$2" \
+      -group "$NOTIFY_GROUP" \
+      -execute "$(printf '%q' "$TUI")" >/dev/null 2>&1
+    rc=$?
+    ((rc == 0)) && return 0
+    warn "terminal-notifier : échec, $(notifier_reason "$rc") — repli osascript." \
+      "Diagnostic : $NOTIFIER -diagnose"
+  fi
+  osascript \
+    -e 'on run argv' \
+    -e 'display notification (item 2 of argv) with title (item 1 of argv)' \
+    -e 'end run' \
+    "$1" "$2" >/dev/null 2>&1
+}
+
+mkdir -p "$STATE_DIR" "${LOG_FILE%/*}" || exit 0
+trim_journal
+
+command -v brew >/dev/null 2>&1 || {
+  warn "brew introuvable"
+  exit 0
+}
+command -v jq >/dev/null 2>&1 || {
+  warn "jq introuvable (brew install jq)"
+  exit 0
+}
+
+# ── 1. Catalogue ─────────────────────────────────────────────
+if ((DO_UPDATE)) && ! update_catalog; then
+  warn "brew update : échec ($UPDATE_TRIES essai(s)) — $UPDATE_ERROR"
+  exit 0
+fi
+
+# ── 2. Paquets obsolètes ─────────────────────────────────────
+# Le code retour de `brew outdated` n'est pas fiable pour détecter une erreur :
+# seule la validité du JSON compte.
+json=$(brew outdated --json=v2 2>/dev/null)
+jq -e '(.formulae | type == "array") and (.casks | type == "array")' \
+  >/dev/null 2>&1 <<<"$json" || {
+  warn "brew outdated : sortie inattendue"
+  exit 0
+}
+
+formula_names=$(jq -r '.formulae[] | select(.pinned | not) | .name' <<<"$json")
+cask_names=$(jq -r '.casks[].name' <<<"$json")
+
+if ((VERBOSE)); then
+  jq -r '
+    def versions: .installed_versions
+      | if type == "array" then join(", ") else tostring end;
+    (.formulae[] | select(.pinned | not)
+      | "formule : \(.name) \(versions) -> \(.current_version)"),
+    (.formulae[] | select(.pinned)
+      | "épinglée, ignorée : \(.name) \(versions) -> \(.current_version)"),
+    (.casks[] | "cask : \(.name) \(versions) -> \(.current_version)")
+  ' <<<"$json" >&2
+fi
+
+# Tri en locale C : l'ordre ne doit pas dépendre de l'appelant (terminal en
+# fr_FR, agent sans locale), sinon l'état « changerait » d'un appel à l'autre.
+pending=$(printf '%s\n%s\n' "$formula_names" "$cask_names" | awk 'NF' | LC_ALL=C sort -u)
+formula_count=$(count_lines "$formula_names")
+cask_count=$(count_lines "$cask_names")
+count=$(count_lines "$pending")
+log "en attente : $count (formules $formula_count, casks $cask_count)"
+
+# ── 3. État affiché par sketchybar ───────────────────────────
+# Mis à jour sur tout changement, retour à zéro compris — sinon l'indicateur
+# resterait affiché après une mise à jour.
+if [[ $pending != "$(read_file "$STATE_FILE")" ]]; then
+  printf '%s\n' "$pending" >"$STATE_FILE" &&
+    sketchybar --trigger "$SKETCHYBAR_EVENT" >/dev/null 2>&1
+fi
+
+# ── 4. Notification ─────────────────────────────────────────
+if ((count == 0)); then
+  if [[ -n $(read_file "$NOTIFIED_FILE") ]]; then
+    : >"$NOTIFIED_FILE"
+    # Retire la notification devenue caduque du centre de notifications.
+    [[ -x $NOTIFIER ]] && "$NOTIFIER" -remove "$NOTIFY_GROUP" >/dev/null 2>&1
+  fi
+  journal "OK : aucune mise à jour"
+  exit 0
+fi
+
+summary="$count en attente ($(join_names "$pending" "$JOURNAL_MAX_NAMES"))"
+
+if [[ $pending == "$(read_file "$NOTIFIED_FILE")" ]] && ((VERBOSE == 0)); then
+  journal "OK : $summary, déjà notifié"
+  exit 0
+fi
+
+if ((count > 1)); then
+  title="$count mises à jour disponibles"
+else
+  title="1 mise à jour disponible"
+fi
+body="$(plural "$formula_count" formule), $(plural "$cask_count" cask)"$'\n'"$(join_names "$pending" "$NOTIFY_MAX_NAMES")"
+
+if notify "$title" "$body"; then
+  printf '%s\n' "$pending" >"$NOTIFIED_FILE"
+  journal "OK : $summary, notifié"
+else
+  warn "$summary, notification en échec — nouvel essai à la prochaine vérification"
+fi
+exit 0

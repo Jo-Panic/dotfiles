@@ -7,16 +7,16 @@ ITEM_DIR="$CONFIG_DIR/items"
 
 # ── Bar ──────────────────────────────────────────────────────
 # Style "floating pill" inspiré de la waybar Hyprland
-sketchybar --bar height=38 \
+sketchybar --bar height=42 \
   blur_radius=30 \
   position=top \
   sticky=off \
   padding_left=10 \
   padding_right=10 \
-  margin=8 \
-  y_offset=4 \
-  corner_radius=12 \
-  border_width=1 \
+  margin=0 \
+  y_offset=0 \
+  corner_radius=0 \
+  border_width=0 \
   border_color=$BAR_BORDER_COLOR \
   color=$BAR_COLOR
 
@@ -49,12 +49,14 @@ source $ITEM_DIR/front_app.sh
 
 # ── Right: Modules ───────────────────────────────────────────
 # Ordre d'ajout = droite vers gauche
-# Résultat visuel : mullvad | network | volume | battery | power
+# Résultat visuel : updates | mullvad | network | volume | battery | power
+# (updates n'apparaît que si des mises à jour sont en attente)
 source $ITEM_DIR/power.sh
 source $ITEM_DIR/battery.sh
 source $ITEM_DIR/volume.sh
 source $ITEM_DIR/network.sh
 source $ITEM_DIR/mullvad.sh
+source $ITEM_DIR/updates.sh
 
 # ── Finalize ─────────────────────────────────────────────────
 sketchybar --update

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# (Re)charge l'agent launchd de vérification des mises à jour Homebrew.
+# Pendant de `systemctl --user enable --now updates-check.timer` (Arch).
+#
+# Re-run quand le plist change :
+# plist : {{ include "Library/LaunchAgents/local.updates-check.plist.tmpl" | sha256sum }}
+#
+# RunAtLoad : le rechargement déclenche aussitôt une vérification.
+
+LABEL=local.updates-check
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+DOMAIN="gui/$(id -u)"
+
+mkdir -p "$HOME/Library/Logs"
+
+# bootout est asynchrone : un bootstrap immédiat peut échouer
+# (« Bootstrap failed: 5 »), d'où les quelques tentatives.
+launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null
+for _ in 1 2 3 4 5; do
+  launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null && exit 0
+  sleep 1
+done
+
+# Un échec ne bloque pas chezmoi apply.
+echo "⚠ updates-check : chargement de l'agent impossible, relancer à la main :" >&2
+echo "  launchctl bootstrap $DOMAIN $PLIST" >&2

@@ -51,7 +51,9 @@ yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info
 
 # Send specific app to space
 yabai -m rule --add app="^iTerm2$" space=1
-yabai -m rule --add app="^Ghostty$" space=^1
+# La fenêtre de mise à jour (updates-tui.sh) est exclue : elle reste
+# sur le space courant
+yabai -m rule --add app="^Ghostty$" title!="^updates$" space=^1
 yabai -m rule --add app="^Proton Mail$" space=2
 yabai -m rule --add app="^Brave Browser$" space=3
 yabai -m rule --add app="^Obsidian$" space=^4
@@ -59,6 +61,11 @@ yabai -m rule --add app="^Affinity Photo 2$" space=^5
 yabai -m rule --add app="^Firefox$" space=^6
 yabai -m rule --add app="^Mullvad Browser$" space=^7
 yabai -m rule --add app="^Tor Browser$" space=^7
+
+# Session de mise à jour Homebrew (sketchybar → updates-tui.sh) :
+# flottante et centrée, comme les TUI flottants de Hyprland.
+# Après les règles « space » : wm-launch-app lit la première règle Ghostty.
+yabai -m rule --add app="^Ghostty$" title="^updates$" manage=off grid=6:6:1:1:4:4
 
 # Firefox hors VPN → bordure rouge = IP réelle exposée
 # (même bundle que Firefox : identifié par borders-novpn, pas par une règle)
