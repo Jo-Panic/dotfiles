@@ -45,8 +45,10 @@ USERJS="$HOME/.config/firefox/user.js"
 USERCHROME="$HOME/.config/firefox/chrome/userChrome.css"
 USERCHROME_NOVPN="$HOME/.config/firefox/chrome/userChrome-novpn.css"
 
-# Architecture native de la machine, même si ce script tourne sous Rosetta
-if [[ $(sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
+# Architecture native de la machine, même si ce script tourne sous Rosetta.
+# Chemin absolu : appelé par le lanceur, ce script hérite d'un PATH qui
+# peut ne pas contenir /usr/sbin.
+if [[ $(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
   ARCH=arm64
 else
   ARCH=x86_64

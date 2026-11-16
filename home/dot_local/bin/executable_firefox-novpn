@@ -29,8 +29,10 @@
 set -uo pipefail
 
 # PATH explicite : LaunchServices lance avec un PATH minimal.
-# yabai et jq sont sous /opt/homebrew/bin sur Apple Silicon.
-export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+# yabai et jq sont sous /opt/homebrew/bin sur Apple Silicon ; sysctl est
+# sous /usr/sbin (sans lui, la détection d'architecture concluait à
+# x86_64 et le setup recompilait tout en Intel, donc sous Rosetta).
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 FIREFOX="/Applications/Firefox.app/Contents/MacOS/firefox"
 EXCLUDE="$HOME/.local/bin/mullvad-exclude"
@@ -75,7 +77,7 @@ fi
 }
 
 # Architecture native, même si ce lanceur tourne sous Rosetta
-if [[ $(sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
+if [[ $(/usr/sbin/sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
   ARCH=arm64
 else
   ARCH=x86_64
