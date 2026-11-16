@@ -13,6 +13,12 @@
 # Les formules épinglées (brew pin) sont ignorées : `brew upgrade` les saute,
 # elles resteraient sinon « en attente » indéfiniment.
 #
+# Les casks déclarés auto_updates (colonne A/U de `brew cu`) sont inclus :
+# par défaut Homebrew les laisse se mettre à jour eux-mêmes, et ceux qui ne
+# le font pas (Brave jamais relancé, SF Symbols) ne l'étaient jamais. Comme
+# pacman, Homebrew gère donc tout. Réglage CASK_FLAGS, à garder identique
+# dans updates-tui.sh — sinon des casks resteraient « en attente ».
+#
 # Autre différence : l'état affiché par sketchybar et la notification sont
 # suivis séparément (pending / notified). Un échec de notification ne bloque
 # pas la barre, et la notification est retentée à la vérification suivante.
@@ -55,6 +61,8 @@ JOURNAL_MAX_NAMES=10                # noms listés dans la ligne de journal
 NOTIFY_GROUP=updates-check          # remplace la notification précédente
 SKETCHYBAR_EVENT=updates_changed    # cf. items/updates.sh
 UPDATE_RETRY_DELAYS="30 60 120"     # secondes entre les essais de brew update (agent)
+CASK_FLAGS=--greedy-auto-updates    # vide : comportement par défaut de Homebrew
+                                    # (même valeur dans updates-tui.sh)
 TUI="$HOME/.config/sketchybar/plugins/updates-tui.sh"   # clic sur la notification
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/updates-check"
 STATE_FILE="$STATE_DIR/pending"     # ce qu'affiche sketchybar
@@ -227,7 +235,9 @@ fi
 # ── 2. Paquets obsolètes ─────────────────────────────────────
 # Le code retour de `brew outdated` n'est pas fiable pour détecter une erreur :
 # seule la validité du JSON compte.
-json=$(brew outdated --json=v2 2>/dev/null)
+# ${CASK_FLAGS:+…} plutôt qu'un tableau : un tableau vide sous set -u est
+# une erreur en bash 3.2.
+json=$(brew outdated --json=v2 ${CASK_FLAGS:+"$CASK_FLAGS"} 2>/dev/null)
 jq -e '(.formulae | type == "array") and (.casks | type == "array")' \
   >/dev/null 2>&1 <<<"$json" || {
   warn "brew outdated : sortie inattendue"

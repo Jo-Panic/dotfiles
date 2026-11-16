@@ -28,6 +28,9 @@ export HOMEBREW_NO_ENV_HINTS=1
 # ── Réglages ─────────────────────────────────────────────────
 TITLE=updates
 GRID=6:6:1:1:4:4 # filet de sécurité, même valeur que la règle yabai
+# Casks auto_updates inclus : même valeur que CASK_FLAGS dans updates-check,
+# sinon les paquets annoncés ne seraient pas tous mis à jour.
+CASK_FLAGS=--greedy-auto-updates
 CHECK="$HOME/.local/bin/updates-check"
 STATE_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/updates-check/pending"
 
@@ -46,7 +49,7 @@ run_session() {
   brew update ||
     printf '\n[Attention] brew update a échoué : la liste peut être incomplète.\n'
 
-  outdated=$(brew outdated --verbose)
+  outdated=$(brew outdated --verbose ${CASK_FLAGS:+"$CASK_FLAGS"})
   if [ -z "$outdated" ]; then
     section "Aucune mise à jour disponible."
   else
@@ -55,7 +58,7 @@ run_session() {
     read -rp ":: Procéder à la mise à jour ? [O/n] " answer
     case $answer in
     [nN]*) printf 'Mise à jour annulée.\n' ;;
-    *) brew upgrade && upgraded=1 ;;
+    *) brew upgrade ${CASK_FLAGS:+"$CASK_FLAGS"} && upgraded=1 ;;
     esac
   fi
 
