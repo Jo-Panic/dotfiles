@@ -5,6 +5,7 @@ set -uo pipefail
 #
 # Re-run quand un fichier canonique change :
 # firefox-novpn-setup  : {{ include "dot_local/bin/executable_firefox-novpn-setup" | sha256sum }}
+# mullvad-exclude.c    : {{ include "dot_local/share/mullvad-exclude/mullvad-exclude.c" | sha256sum }}
 # user.js              : {{ include "dot_config/firefox/user.js" | sha256sum }}
 # userChrome.css       : {{ include "dot_config/firefox/chrome/userChrome.css" | sha256sum }}
 # userChrome-novpn.css : {{ include "dot_config/firefox/chrome/userChrome-novpn.css" | sha256sum }}

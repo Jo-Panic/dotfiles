@@ -4,13 +4,16 @@
 # Prépare « Firefox (hors VPN) », équivalent macOS de firefox-novpn.desktop
 # (arch-dotfiles). Idempotent : relançable à volonté pour tout réparer.
 #
-#   1. ~/.local/bin/mullvad-exclude = copie de /usr/bin/env
+#   1. ~/.local/bin/mullvad-exclude, compilé en natif depuis
+#      ~/.local/share/mullvad-exclude/mullvad-exclude.c
 #      Sur macOS, Mullvad exclut par chemin exact d'exécutable, et
 #      l'exclusion se transmet aux processus enfants, y compris à travers
-#      exec. Exclure cette copie donne l'équivalent du mullvad-exclude
+#      exec. Exclure ce binaire donne l'équivalent du mullvad-exclude
 #      Linux :  mullvad-exclude <commande> [args…]
 #      Un script ne conviendrait pas : pour un script, macOS déclare
-#      l'interpréteur (/bin/bash) comme exécutable.
+#      l'interpréteur (/bin/bash) comme exécutable. Une copie de
+#      /usr/bin/env non plus : elle tourne sous Rosetta, et Firefox avec
+#      (cf. mullvad-exclude.c). Une telle copie est remplacée ici.
 #   2. Profil Firefox « novpn »
 #   3. Préférences du profil : user.js commun, userChrome.css commun
 #      suivi de la surcouche userChrome-novpn.css
@@ -27,6 +30,7 @@ set -euo pipefail
 FIREFOX_APP="/Applications/Firefox.app"
 FIREFOX="$FIREFOX_APP/Contents/MacOS/firefox"
 EXCLUDE="$HOME/.local/bin/mullvad-exclude"
+EXCLUDE_SRC="$HOME/.local/share/mullvad-exclude/mullvad-exclude.c"
 MULLVAD="/usr/local/bin/mullvad"
 FF="$HOME/Library/Application Support/Firefox"
 LAUNCHER="$HOME/Applications/Firefox (hors VPN).app"
@@ -44,10 +48,33 @@ echo "Firefox hors VPN…"
 }
 
 # ── 1. mullvad-exclude ───────────────────────────────────────
-mkdir -p "$(dirname "$EXCLUDE")"
-if ! cmp -s /usr/bin/env "$EXCLUDE"; then
-  install -m 755 /usr/bin/env "$EXCLUDE"
-  echo "  → $EXCLUDE (copie de /usr/bin/env)"
+# Architecture native de la machine, même si ce script tourne sous Rosetta
+if [[ $(sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
+  ARCH=arm64
+else
+  ARCH=x86_64
+fi
+
+# À (re)compiler : absent, source modifiée, ou pas en natif (ancienne
+# copie de /usr/bin/env, dont lipo donne « x86_64 arm64e »)
+if [[ ! -x $EXCLUDE || $EXCLUDE_SRC -nt $EXCLUDE ||
+  $(lipo -archs "$EXCLUDE" 2>/dev/null) != "$ARCH" ]]; then
+  xcode-select -p >/dev/null 2>&1 || {
+    echo "  ✗ outils de compilation absents : xcode-select --install" >&2
+    exit 1
+  }
+  mkdir -p "$(dirname "$EXCLUDE")"
+  # Fichier temporaire puis mv, pour un nouvel inode : réécrire en place
+  # un binaire signé peut le faire tuer (Killed: 9) au lancement suivant.
+  tmp=$(mktemp "$EXCLUDE.XXXXXX")
+  if ! cc -arch "$ARCH" -O2 -Wall -o "$tmp" "$EXCLUDE_SRC"; then
+    rm -f "$tmp"
+    echo "  ✗ compilation de mullvad-exclude impossible ($EXCLUDE_SRC)" >&2
+    exit 1
+  fi
+  chmod 755 "$tmp"
+  mv -f "$tmp" "$EXCLUDE"
+  echo "  → $EXCLUDE compilé ($ARCH natif)"
 fi
 
 # ── 2. Profil novpn ──────────────────────────────────────────

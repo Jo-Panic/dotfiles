@@ -67,9 +67,19 @@ fi
   exit 1
 }
 
+# Architecture native, même si ce lanceur tourne sous Rosetta
+if [[ $(sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
+  ARCH=arm64
+else
+  ARCH=x86_64
+fi
+
 ready() {
   local st
   [[ -x $EXCLUDE ]] || return 1
+  # mullvad-exclude doit être natif, sinon Firefox tourne sous Rosetta
+  # (cas d'une ancienne copie de /usr/bin/env : « x86_64 arm64e »)
+  [[ $(lipo -archs "$EXCLUDE" 2>/dev/null) == "$ARCH" ]] || return 1
   compgen -G "$PROFILES/*.novpn" >/dev/null || return 1
   st=$("$MULLVAD" split-tunnel get 2>/dev/null) || return 1
   grep -qi 'state: on' <<<"$st" && grep -qxF "$EXCLUDE" <<<"$st"
