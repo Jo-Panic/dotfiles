@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
-# ~/Applications/Firefox (hors VPN).app/Contents/MacOS/firefox-novpn
+# ~/.local/bin/firefox-novpn
 #
-# Lanceur Spotlight de Firefox hors du tunnel Mullvad (IP réelle exposée),
-# pour les sites qui bloquent le VPN. Équivalent macOS de
-# firefox-novpn.desktop (arch-dotfiles) :
+# Lance Firefox hors du tunnel Mullvad (IP réelle exposée), pour les
+# sites qui bloquent le VPN. Équivalent macOS de firefox-novpn.desktop
+# (arch-dotfiles) :
 #
 #   mullvad-exclude firefox --no-remote -P novpn
+#
+# Utilisable depuis un terminal, et depuis Spotlight via
+# ~/Applications/Firefox (hors VPN).app, dont l'exécutable natif
+# (compilé par firefox-novpn-setup) passe la main à ce script.
 #
 # Points propres à macOS :
 #   - Firefox est lancé en exécutant directement son binaire, jamais via
 #     open : open passe par launchd, Firefox ne serait plus un enfant de
 #     mullvad-exclude et perdrait l'exclusion.
+#   - Sur Apple Silicon, Firefox est forcé en arm64 (arch -arm64) : si un
+#     maillon de la chaîne tournait sous Rosetta, Firefox hériterait de la
+#     préférence x86_64 et tournerait sous Rosetta lui aussi.
 #   - Le lanceur rend la main aussitôt (Firefox en arrière-plan). Un exec
 #     ferait hériter Firefox du LSUIElement du lanceur (ni Dock ni menu).
 #   - Prérequis manquants → firefox-novpn-setup est lancé une fois pour
@@ -102,6 +109,12 @@ if [[ -n ${space:-} ]]; then
   yabai -m space --focus "$space" 2>/dev/null || true
 fi
 
-# ── 4. Lancement hors tunnel ─────────────────────────────────
-"$EXCLUDE" "$FIREFOX" --no-remote -P novpn >/dev/null 2>&1 &
+# ── 4. Lancement hors tunnel, en natif ───────────────────────
+# arch -arm64 remplace son propre processus par Firefox (même pid) :
+# l'exclusion Mullvad, transmise à travers exec, est conservée.
+cmd=("$FIREFOX" --no-remote -P novpn)
+if [[ $ARCH == arm64 ]]; then
+  cmd=(/usr/bin/arch -arm64 "${cmd[@]}")
+fi
+"$EXCLUDE" "${cmd[@]}" >/dev/null 2>&1 &
 disown

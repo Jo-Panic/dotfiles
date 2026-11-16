@@ -17,13 +17,16 @@
 #   2. Profil Firefox « novpn »
 #   3. Préférences du profil : user.js commun, userChrome.css commun
 #      suivi de la surcouche userChrome-novpn.css
-#   4. Icône du lanceur ~/Applications/Firefox (hors VPN).app
+#   4. Lanceur Spotlight ~/Applications/Firefox (hors VPN).app :
+#      exécutable natif compilé depuis ~/.local/share/firefox-novpn/
+#      launcher.c (un script y serait lancé sous Rosetta), icône copiée
+#      depuis Firefox.app, signature ad hoc, enregistrement LaunchServices
 #   5. Mullvad : exclusion de mullvad-exclude + split tunneling actif
 #      (Mullvad doit avoir l'Accès complet au disque, cf. Réglages
 #      Système → Confidentialité et sécurité)
 #
 # Appelé par run_onchange_after_setup-firefox-novpn.sh (chezmoi apply) et
-# par le lanceur quand un prérequis manque.
+# par ~/.local/bin/firefox-novpn quand un prérequis manque.
 
 set -euo pipefail
 
@@ -34,11 +37,47 @@ EXCLUDE_SRC="$HOME/.local/share/mullvad-exclude/mullvad-exclude.c"
 MULLVAD="/usr/local/bin/mullvad"
 FF="$HOME/Library/Application Support/Firefox"
 LAUNCHER="$HOME/Applications/Firefox (hors VPN).app"
+LAUNCHER_BIN="$LAUNCHER/Contents/MacOS/firefox-novpn"
+LAUNCHER_SRC="$HOME/.local/share/firefox-novpn/launcher.c"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 USERJS="$HOME/.config/firefox/user.js"
 USERCHROME="$HOME/.config/firefox/chrome/userChrome.css"
 USERCHROME_NOVPN="$HOME/.config/firefox/chrome/userChrome-novpn.css"
+
+# Architecture native de la machine, même si ce script tourne sous Rosetta
+if [[ $(sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
+  ARCH=arm64
+else
+  ARCH=x86_64
+fi
+
+# build <source.c> <binaire> : compile en natif si le binaire est absent,
+# plus ancien que la source, ou d'une autre architecture (ancienne copie
+# de /usr/bin/env, « x86_64 arm64e » pour lipo ; ancien script…)
+build() {
+  local src=$1 out=$2 tmp
+  if [[ -x $out && ! $src -nt $out &&
+    $(lipo -archs "$out" 2>/dev/null) == "$ARCH" ]]; then
+    return 0
+  fi
+  xcode-select -p >/dev/null 2>&1 || {
+    echo "  ✗ outils de compilation absents : xcode-select --install" >&2
+    return 1
+  }
+  mkdir -p "$(dirname "$out")"
+  # Fichier temporaire puis mv, pour un nouvel inode : réécrire en place
+  # un binaire signé peut le faire tuer (Killed: 9) au lancement suivant.
+  tmp=$(mktemp "$out.XXXXXX")
+  if ! cc -arch "$ARCH" -O2 -Wall -o "$tmp" "$src"; then
+    rm -f "$tmp"
+    echo "  ✗ compilation impossible : $src" >&2
+    return 1
+  fi
+  chmod 755 "$tmp"
+  mv -f "$tmp" "$out"
+  echo "  → $out compilé ($ARCH natif)"
+}
 
 echo "Firefox hors VPN…"
 
@@ -48,34 +87,7 @@ echo "Firefox hors VPN…"
 }
 
 # ── 1. mullvad-exclude ───────────────────────────────────────
-# Architecture native de la machine, même si ce script tourne sous Rosetta
-if [[ $(sysctl -n hw.optional.arm64 2>/dev/null) == 1 ]]; then
-  ARCH=arm64
-else
-  ARCH=x86_64
-fi
-
-# À (re)compiler : absent, source modifiée, ou pas en natif (ancienne
-# copie de /usr/bin/env, dont lipo donne « x86_64 arm64e »)
-if [[ ! -x $EXCLUDE || $EXCLUDE_SRC -nt $EXCLUDE ||
-  $(lipo -archs "$EXCLUDE" 2>/dev/null) != "$ARCH" ]]; then
-  xcode-select -p >/dev/null 2>&1 || {
-    echo "  ✗ outils de compilation absents : xcode-select --install" >&2
-    exit 1
-  }
-  mkdir -p "$(dirname "$EXCLUDE")"
-  # Fichier temporaire puis mv, pour un nouvel inode : réécrire en place
-  # un binaire signé peut le faire tuer (Killed: 9) au lancement suivant.
-  tmp=$(mktemp "$EXCLUDE.XXXXXX")
-  if ! cc -arch "$ARCH" -O2 -Wall -o "$tmp" "$EXCLUDE_SRC"; then
-    rm -f "$tmp"
-    echo "  ✗ compilation de mullvad-exclude impossible ($EXCLUDE_SRC)" >&2
-    exit 1
-  fi
-  chmod 755 "$tmp"
-  mv -f "$tmp" "$EXCLUDE"
-  echo "  → $EXCLUDE compilé ($ARCH natif)"
-fi
+build "$EXCLUDE_SRC" "$EXCLUDE" || exit 1
 
 # ── 2. Profil novpn ──────────────────────────────────────────
 if ! compgen -G "$FF/Profiles/*.novpn" >/dev/null; then
@@ -94,8 +106,11 @@ for p in "$FF"/Profiles/*.novpn; do
   echo "  → $p"
 done
 
-# ── 4. Icône du lanceur ──────────────────────────────────────
+# ── 4. Lanceur Spotlight ─────────────────────────────────────
 if [[ -d $LAUNCHER ]]; then
+  # Exécutable natif : remplace l'ancien script, lancé sous Rosetta
+  build "$LAUNCHER_SRC" "$LAUNCHER_BIN" || exit 1
+
   icon=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' \
     "$FIREFOX_APP/Contents/Info.plist" 2>/dev/null || echo firefox)
   src="$FIREFOX_APP/Contents/Resources/${icon%.icns}.icns"
@@ -103,14 +118,26 @@ if [[ -d $LAUNCHER ]]; then
     mkdir -p "$LAUNCHER/Contents/Resources"
     if ! cmp -s "$src" "$LAUNCHER/Contents/Resources/firefox-novpn.icns"; then
       cp "$src" "$LAUNCHER/Contents/Resources/firefox-novpn.icns"
-      touch "$LAUNCHER"
       echo "  → icône du lanceur"
     fi
-    # Enregistrement LaunchServices : Spotlight le propose aussitôt
-    "$LSREGISTER" -f "$LAUNCHER" 2>/dev/null || true
   else
     echo "  ⚠ icône de Firefox introuvable ($src)" >&2
   fi
+
+  # Signature ad hoc du bundle entier (Info.plist et icône compris),
+  # refaite dès qu'un élément change (exécutable, Info.plist, icône)
+  if ! codesign --verify "$LAUNCHER" >/dev/null 2>&1; then
+    if codesign --force --sign - "$LAUNCHER" >/dev/null 2>&1; then
+      touch "$LAUNCHER"
+      echo "  → lanceur signé"
+    else
+      echo "  ⚠ signature du lanceur impossible (codesign)" >&2
+    fi
+  fi
+
+  # Enregistrement LaunchServices : Spotlight le propose aussitôt, et
+  # l'architecture du nouvel exécutable remplace celle mise en cache
+  "$LSREGISTER" -f "$LAUNCHER" 2>/dev/null || true
 fi
 
 # ── 5. Mullvad ───────────────────────────────────────────────

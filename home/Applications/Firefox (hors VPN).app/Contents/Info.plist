@@ -2,9 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Firefox (hors VPN) : lanceur Spotlight, équivalent macOS de
-  firefox-novpn.desktop (arch-dotfiles). Le travail est fait par
-  Contents/MacOS/firefox-novpn ; l'icône est copiée depuis Firefox.app
-  par firefox-novpn-setup.
+  firefox-novpn.desktop (arch-dotfiles). Le travail est fait par le
+  script ~/.local/bin/firefox-novpn. firefox-novpn-setup compile
+  l'exécutable natif Contents/MacOS/firefox-novpn (launcher.c), qui lui
+  passe la main, copie l'icône depuis Firefox.app et signe le bundle.
+
+  LSArchitecturePriority : arm64 d'abord, jamais Rosetta par défaut.
 
   LSUIElement : le lanceur rend la main aussitôt, pas d'icône fantôme
   dans le Dock (Firefox a la sienne).
@@ -31,6 +34,11 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSArchitecturePriority</key>
+	<array>
+		<string>arm64</string>
+		<string>x86_64</string>
+	</array>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
 	<key>LSUIElement</key>
