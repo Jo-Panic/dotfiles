@@ -1,17 +1,26 @@
 #!/bin/bash
 
 # ── updates-tui ──────────────────────────────────────────────
-# Session de mise à jour Homebrew dans une fenêtre Ghostty flottante.
-# Pendant de waybar/scripts/updates-tui.sh (Arch : foot + paru) ; foot
-# n'existe que sous Wayland, Ghostty en tient le rôle.
+# Session de mise à jour Homebrew dans une fenêtre foot flottante.
+# Pendant de waybar/scripts/updates-tui.sh (Arch : foot + paru), avec le
+# portage macOS de foot (brew install --cask gobijan/tap/foot). foot est
+# réservé aux fenêtres temporaires, Ghostty au travail courant.
 #
 # Sans argument (clic sketchybar, clic sur la notification) :
 #   focus-or-launch. Si la fenêtre « updates » existe, yabai lui donne le
-#   focus ; sinon une instance Ghostty dédiée est lancée (open -na), titrée
-#   « updates » pour les règles yabai (flottante, centrée, space courant).
-#   --window-save-state=never : n'y restaure pas la session précédente.
-#   -e implique quit-after-last-window-closed : l'instance quitte avec
-#   la fenêtre, sans icône orpheline dans le Dock.
+#   focus ; sinon foot est lancé avec ~/.config/foot/updatestui.ini
+#   (Catppuccin Mocha, taille) et le titre « updates ».
+#   Flottante dès son apparition : la règle yabai porte sur l'application
+#   (app="^foot$" manage=off), connue à la création de la fenêtre, et
+#   foot centre lui-même la première fenêtre d'un lancement.
+#
+#   foot reste un processus enfant de ce script jusqu'à sa fermeture :
+#   le portage distingue un lancement depuis un shell (parent ≠ launchd)
+#   d'un lancement comme application (Dock, open). Depuis un shell, il
+#   quitte avec sa fenêtre, sans session persistante ni réouverture des
+#   fenêtres d'une session précédente — comme sous Linux. Un `exec` ou un
+#   lancement détaché ferait de launchd son parent : ce script est
+#   lui-même lancé en arrière-plan par sketchybar, qui ne l'attend pas.
 #
 # Avec --run (dans la fenêtre) : brew update, liste, confirmation [O/n]
 #   comme paru, brew upgrade, puis updates-check --no-update pour
@@ -23,11 +32,13 @@
 
 set -uo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export LANG="${LANG:-fr_FR.UTF-8}"
 export HOMEBREW_NO_ENV_HINTS=1
 
 # ── Réglages ─────────────────────────────────────────────────
 TITLE=updates
-GRID=6:6:1:1:4:4 # filet de sécurité, même valeur que la règle yabai
+FOOT_CONFIG="$HOME/.config/foot/updatestui.ini"
+GRID=6:6:1:1:4:4 # filet de sécurité, si la règle yabai manque
 # Casks auto_updates inclus : même valeur que CASK_FLAGS dans updates-check,
 # sinon les paquets annoncés ne seraient pas tous mis à jour.
 CASK_FLAGS=--greedy-auto-updates
@@ -39,7 +50,7 @@ case $0 in
 *) SELF=$(command -v "$0") ;;
 esac
 
-# ── Session (dans la fenêtre Ghostty) ────────────────────────
+# ── Session (dans la fenêtre foot) ───────────────────────────
 section() { printf '\n\033[1;34m::\033[0;1m %s\033[0m\n' "$*"; }
 
 run_session() {
@@ -80,6 +91,9 @@ run_session() {
     printf '/private/etc/sudoers.d/yabai, puis yabai --restart-service.\n'
   fi
 
+  # foot se met à jour lui-même (Sparkle) et via son cask : la fenêtre en
+  # cours appartient à l'ancienne version, la suivante sera à jour.
+
   printf '\n[Terminé — une touche pour fermer]'
   read -rsn1
 }
@@ -93,32 +107,36 @@ fi
 find_window() {
   yabai -m query --windows 2>/dev/null |
     jq -r --arg t "$TITLE" \
-      '[.[] | select(.app == "Ghostty" and .title == $t)][0].id // empty' 2>/dev/null
+      '[.[] | select(.app == "foot" and .title == $t)][0].id // empty' 2>/dev/null
 }
 
-# Filet de sécurité si la règle yabai n'a pas pris (titre posé après la
-# création de la fenêtre) : flottante, centrée, ramenée sur le space courant.
-place_window() {
-  local space="$1" id="" info i
+# Attend la fenêtre puis lui donne le focus (une application lancée
+# depuis un shell n'est pas toujours mise au premier plan par macOS).
+# Filet de sécurité si la règle yabai manque (yabai pas redémarré après
+# chezmoi apply) : flottante et centrée.
+focus_window() {
+  local id="" i
 
-  for ((i = 0; i < 50; i++)); do
+  for ((i = 0; i < 100; i++)); do
     id=$(find_window)
     [ -n "$id" ] && break
     sleep 0.1
   done
   [ -n "$id" ] || return 0
 
-  info=$(yabai -m query --windows --window "$id" 2>/dev/null) || return 0
-  if [ "$(jq -r '."is-floating"' <<<"$info")" != "true" ]; then
+  if [ "$(yabai -m query --windows --window "$id" 2>/dev/null |
+    jq -r '."is-floating"' 2>/dev/null)" = "false" ]; then
     yabai -m window "$id" --toggle float
     yabai -m window "$id" --grid "$GRID"
   fi
-  if [ -n "$space" ] && [ "$(jq -r '.space' <<<"$info")" != "$space" ]; then
-    yabai -m window "$id" --space "$space"
-    yabai -m space --focus "$space"
-  fi
   yabai -m window --focus "$id" 2>/dev/null
   return 0
+}
+
+command -v foot >/dev/null 2>&1 || {
+  osascript -e 'display notification "brew install --cask gobijan/tap/foot" with title "updates-tui : foot introuvable"' \
+    >/dev/null 2>&1
+  exit 1
 }
 
 if command -v yabai >/dev/null 2>&1; then
@@ -127,17 +145,15 @@ if command -v yabai >/dev/null 2>&1; then
     yabai -m window --focus "$id"
     exit 0
   fi
-  space=$(yabai -m query --spaces --space 2>/dev/null | jq -r '.index // empty' 2>/dev/null)
 fi
 
 # Sans yabai (ou fenêtre introuvable) : pas de seconde session si une
 # première tourne encore — brew refuserait de toute façon le verrou.
 pgrep -f -- "updates-tui.sh --run" >/dev/null 2>&1 && exit 0
 
-open -na Ghostty --args \
-  --title="$TITLE" \
-  --window-save-state=never \
-  -e /bin/bash "$SELF" --run
+command -v yabai >/dev/null 2>&1 && focus_window &
 
-command -v yabai >/dev/null 2>&1 && place_window "${space:-}"
+# Au premier plan de ce script (cf. en-tête) : il attend la fermeture.
+foot --config="$FOOT_CONFIG" --title="$TITLE" \
+  /bin/bash "$SELF" --run </dev/null >/dev/null 2>&1
 exit 0

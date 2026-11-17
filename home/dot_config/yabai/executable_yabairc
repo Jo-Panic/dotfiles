@@ -51,9 +51,7 @@ yabai -m rule --add label="Finder" app="^Finder$" title="(Co(py|nnect)|Move|Info
 
 # Send specific app to space
 yabai -m rule --add app="^iTerm2$" space=1
-# La fenêtre de mise à jour (updates-tui.sh) est exclue : elle reste
-# sur le space courant
-yabai -m rule --add app="^Ghostty$" title!="^updates$" space=^1
+yabai -m rule --add app="^Ghostty$" space=^1
 yabai -m rule --add app="^Proton Mail$" space=2
 yabai -m rule --add app="^Brave Browser$" space=3
 yabai -m rule --add app="^Obsidian$" space=^4
@@ -62,10 +60,14 @@ yabai -m rule --add app="^Firefox$" space=^6
 yabai -m rule --add app="^Mullvad Browser$" space=^7
 yabai -m rule --add app="^Tor Browser$" space=^7
 
-# Session de mise à jour Homebrew (sketchybar → updates-tui.sh) :
-# flottante et centrée, comme les TUI flottants de Hyprland.
-# Après les règles « space » : wm-launch-app lit la première règle Ghostty.
-yabai -m rule --add app="^Ghostty$" title="^updates$" manage=off grid=6:6:1:1:4:4
+# foot : réservé aux fenêtres temporaires (session de mise à jour
+# lancée par updates-tui.sh…), toujours flottantes, comme les TUI
+# flottants de Hyprland ; Ghostty reste le terminal de travail.
+# Règle sur l'application et non sur le titre : yabai n'évalue ses
+# règles qu'une fois, à la création de la fenêtre, avant que le titre
+# soit posé. Pas de grille : foot centre lui-même la première fenêtre
+# d'un lancement, à la taille de son .ini — elle ne bouge plus ensuite.
+yabai -m rule --add app="^foot$" manage=off
 
 # Firefox hors VPN → bordure rouge = IP réelle exposée
 # (même bundle que Firefox : identifié par borders-novpn, pas par une règle)
