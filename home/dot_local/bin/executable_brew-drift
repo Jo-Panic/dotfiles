@@ -1,0 +1,82 @@
+#!/bin/bash
+# ── brew-drift ───────────────────────────────────────────────
+# Écarts entre le Brewfile et ce qui est réellement installé, dans les
+# deux sens. Lecture seule : n'installe ni ne désinstalle rien.
+# Pendant du contrôle d'alignement scripts ↔ système (guide Arch §4.9.3).
+#
+#   « Déclarés mais absents »  : ce que le prochain chezmoi apply (ou
+#                                brew bundle) installera.
+#   « Installés mais absents » : installé à la main (brew install…) sans
+#                                passer par le Brewfile ; l'y ajouter, ou
+#                                le désinstaller.
+#
+# L'état installé vient de `brew bundle dump`, qui ne liste que les
+# paquets installés à la demande, pas leurs dépendances. Les noms sont
+# comparés sans leur tap (cask "gobijan/tap/foot" = cask "foot"), et les
+# taps sans tenir compte de la casse. Seuls tap, brew, cask et mas sont
+# comparés (pas vscode, go, cargo, npm…).
+#
+# Plus sûr que `brew bundle cleanup` pour un simple constat : sans
+# --force, cleanup demande confirmation puis désinstalle.
+#
+# Usage : brew-drift [Brewfile]   (défaut : ~/.Brewfile)
+# Code retour : 0 aligné, 1 écarts, 2 erreur.
+#
+# Écrit pour le /bin/bash 3.2 de macOS.
+set -uo pipefail
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1
+
+BREWFILE=${1:-$HOME/.Brewfile}
+
+[[ -r $BREWFILE ]] || {
+  echo "Brewfile illisible : $BREWFILE" >&2
+  exit 2
+}
+command -v brew >/dev/null 2>&1 || {
+  echo "brew introuvable" >&2
+  exit 2
+}
+
+# Entrées d'un Brewfile lu sur stdin, une par ligne : « type nom », triées.
+# Commentaires et options (args:, id:…) ignorés.
+entries() {
+  awk '
+    /^[[:space:]]*(tap|brew|cask|mas)[[:space:]]+"/ {
+      type = $0
+      sub(/^[[:space:]]*/, "", type)
+      sub(/[[:space:]].*/, "", type)
+      name = $0
+      sub(/^[^"]*"/, "", name)
+      sub(/".*/, "", name)
+      if (type == "tap") name = tolower(name)
+      else if (type != "mas") sub(/.*\//, "", name)
+      print type " " name
+    }' | LC_ALL=C sort -u
+}
+
+wanted=$(entries <"$BREWFILE")
+dump=$(brew bundle dump --file=- --no-describe 2>/dev/null) || {
+  echo "brew bundle dump a échoué" >&2
+  exit 2
+}
+installed=$(printf '%s\n' "$dump" | entries)
+
+missing=$(LC_ALL=C comm -23 <(printf '%s\n' "$wanted") <(printf '%s\n' "$installed") | awk 'NF')
+extra=$(LC_ALL=C comm -13 <(printf '%s\n' "$wanted") <(printf '%s\n' "$installed") | awk 'NF')
+
+if [[ -z $missing && -z $extra ]]; then
+  echo "Brewfile et système alignés ($BREWFILE)."
+  exit 0
+fi
+
+if [[ -n $missing ]]; then
+  echo "=== Déclarés dans le Brewfile mais absents ==="
+  printf '%s\n' "$missing" | sed 's/^/  /'
+fi
+if [[ -n $extra ]]; then
+  [[ -n $missing ]] && echo
+  echo "=== Installés mais absents du Brewfile ==="
+  printf '%s\n' "$extra" | sed 's/^/  /'
+fi
+exit 1

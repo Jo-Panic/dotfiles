@@ -1,0 +1,62 @@
+{{- if eq .chezmoi.os "darwin" -}}
+#!/bin/bash
+# ── install-packages ─────────────────────────────────────────
+# Installe les paquets Homebrew déclarés dans le Brewfile (~/.Brewfile).
+# Pendant de 00-install-base-packages.sh et 02-install-aur-packages.sh
+# (arch-dotfiles), lancé par chezmoi plutôt qu'à la main.
+#
+# Re-run quand le Brewfile change :
+# Brewfile : {{ include "dot_Brewfile" | sha256sum }}
+#
+# before_ : passe avant le déploiement des fichiers et les scripts after_
+# (agent updates-check, préférences Firefox…), qui supposent les paquets
+# présents. Sur un Mac neuf, ~/.Brewfile n'existe pas encore à ce stade :
+# le Brewfile est lu dans le dépôt source.
+#
+# --no-upgrade : n'installe que ce qui manque, comme `pacman -S --needed`.
+# Les mises à jour restent l'affaire de updates-tui.sh. `brew install`
+# peut toutefois mettre à jour une dépendance qu'un nouveau paquet exige.
+#
+# Contrairement à l'agent updates-check, un échec bloque chezmoi apply :
+# chezmoi ne mémorise pas le passage et relancera le script à l'apply
+# suivant, une fois le problème réglé (réseau, cask en échec…). Pour
+# déployer les dotfiles sans attendre : chezmoi apply --exclude=scripts
+#
+# Écrit pour le /bin/bash 3.2 de macOS.
+set -uo pipefail
+
+BREWFILE={{ joinPath .chezmoi.sourceDir "dot_Brewfile" | quote }}
+
+# Homebrew par chemin absolu : sur un Mac neuf, le PATH de la session ne
+# le connaît pas forcément (.zprofile pas encore déployé).
+BREW=""
+for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+  if [[ -x $b ]]; then
+    BREW=$b
+    break
+  fi
+done
+if [[ -z $BREW ]]; then
+  echo "✗ Homebrew introuvable : installer Homebrew (https://brew.sh), puis chezmoi apply" >&2
+  exit 1
+fi
+eval "$("$BREW" shellenv)"
+export HOMEBREW_NO_ENV_HINTS=1
+
+if [[ ! -r $BREWFILE ]]; then
+  echo "✗ Brewfile illisible : $BREWFILE" >&2
+  exit 1
+fi
+
+echo "=== Paquets Homebrew (Brewfile) ==="
+if "$BREW" bundle install --no-upgrade --file="$BREWFILE"; then
+  echo "=== Paquets Homebrew installés ==="
+  exit 0
+fi
+
+echo "" >&2
+echo "✗ brew bundle a échoué. Reste à installer :" >&2
+"$BREW" bundle check --verbose --no-upgrade --file="$BREWFILE" >&2
+echo "Relancer : chezmoi apply (ou brew bundle --no-upgrade --file=\"$BREWFILE\")" >&2
+exit 1
+{{ end -}}

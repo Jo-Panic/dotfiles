@@ -1,0 +1,182 @@
+# ~/.Brewfile — paquets Homebrew de l'environnement macOS
+# Géré par chezmoi (home/dot_Brewfile).
+#
+# Pendant des listes de 00-install-base-packages.sh et
+# 02-install-aur-packages.sh (arch-dotfiles), mais déclaratif : ce fichier
+# décrit l'état voulu, `brew bundle` installe ce qui manque.
+#
+# Installé par run_onchange_before_install-packages.sh.tmpl :
+#   - à `chezmoi init --apply` sur un Mac neuf ;
+#   - à chaque `chezmoi apply` qui suit une modification de ce fichier.
+# Ajouter un paquet : chezmoi edit --apply ~/.Brewfile
+# Écarts avec le système (dans les deux sens, lecture seule) : brew-drift
+#
+# Repris de `brew bundle dump` (24/11/2026), entrée par entrée et options
+# comprises, à deux exceptions près, signalées sur place : l'URL ajoutée
+# aux taps `trusted:`, et l'entrée npm mise en commentaire. Trié ensuite :
+# taps alexays/tap, omacom/mac et jesseduffield/lazygit retirés, nvm aussi ;
+# skhd passé de koekeishiya/formulae à asmvik/formulae.
+#
+# Confiance (Homebrew ≥ 6.0) : le code d'un tap tiers n'est chargé que
+# s'il est approuvé, tap entier ou paquet par paquet (`trusted:`), le
+# pendant de la relecture d'un PKGBUILD de l'AUR. Ce qui ne l'est pas :
+# brew untrust
+#
+# restart_service : service démarré à l'installation, le pendant de
+# 06-enable-user-services.sh. Les autres services sont lancés à part.
+
+# ── Taps tiers ───────────────────────────────────────────────
+# Le pendant de l'AUR : du code hors des dépôts officiels de Homebrew.
+#
+# URL explicite (l'URL par défaut du tap) sur chaque tap `trusted:` :
+# sous la forme courte, tap "a/b", trusted: true, brew bundle peut perdre
+# l'option et ne pas approuver le tap sur un Mac neuf (Homebrew/brew#22668).
+
+# yabai, skhd (ancien nom du tap : koekeishiya/formulae)
+tap "asmvik/formulae", "https://github.com/asmvik/homebrew-formulae", trusted: true
+# Commande brew cu (colonne A/U des casks auto-update)
+tap "buo/cask-upgrade", "https://github.com/buo/homebrew-cask-upgrade", trusted: true
+# sketchybar, borders
+tap "felixkratz/formulae", "https://github.com/FelixKratz/homebrew-formulae", trusted: true
+# foot : seul le cask est approuvé, pas le tap. Voulu : brew untrust liste
+# donc le tap et ses autres casks (usetix).
+tap "gobijan/tap"
+# lazydocker
+tap "jesseduffield/lazydocker", "https://github.com/jesseduffield/homebrew-lazydocker", trusted: true
+# fuse-t-sshfs
+tap "macos-fuse-t/cask", "https://github.com/macos-fuse-t/homebrew-cask", trusted: true
+
+# ── Gestionnaire de fenêtres, barre et bureau ────────────────
+# yabai : la règle sudoers de --load-sa est à refaire après chaque mise à
+# jour (rappel affiché par updates-tui.sh).
+brew "asmvik/formulae/yabai", trusted: true
+brew "asmvik/formulae/skhd", trusted: true # raccourcis clavier
+brew "felixkratz/formulae/sketchybar" # pendant de Waybar
+brew "felixkratz/formulae/borders"    # JankyBorders
+cask "betterdisplay"
+cask "mouseless"                      # souris au clavier
+
+# ── Terminaux ────────────────────────────────────────────────
+cask "ghostty"                        # travail courant
+cask "gobijan/tap/foot", trusted: true # fenêtres temporaires (updates-tui.sh)
+
+# ── Shell et CLI ─────────────────────────────────────────────
+brew "bash"                           # bash ≥ 4.4 pour conv (macOS livre la 3.2)
+brew "coreutils"                      # outils GNU pour conv
+brew "chezmoi"
+brew "neovim"
+brew "tmux"
+brew "fzf"
+brew "zoxide"
+brew "eza"
+brew "bat"
+brew "fd"
+brew "ripgrep"
+brew "yazi"
+brew "jq"                             # updates-check, updates-tui, wm-launch-app
+brew "watch"
+brew "wget"
+brew "rsync"                          # rsync 3 (service-envoi/deployer.sh)
+brew "sevenzip"
+brew "cloc"
+brew "fastfetch"
+
+# ── Surveillance et maintenance ──────────────────────────────
+brew "btop"
+brew "htop"
+brew "mole"                           # nettoyage du Mac
+brew "terminal-notifier"              # notifications de updates-check
+
+# ── Git ──────────────────────────────────────────────────────
+brew "git"
+brew "gh"
+brew "lazygit"
+cask "git-credential-manager"
+
+# ── Développement ────────────────────────────────────────────
+brew "fnm"                            # Node par projet (.nvmrc)
+brew "uv"
+brew "zig"
+brew "jesseduffield/lazydocker/lazydocker"
+cask "docker-desktop"                 # Postgres et Redis de Wavelio
+cask "postico"                        # client PostgreSQL
+cask "lm-studio"                      # LLM locaux
+
+# Mis en commentaire : un paquet npm global dépend du Node actif (fnm).
+# Sur un Mac neuf, aucun Node n'existe encore quand brew bundle passe, et
+# l'échec bloquerait chezmoi apply. Après `fnm install` :
+#   npm install -g corepack
+# npm "corepack"
+
+# ── Bibliothèques ────────────────────────────────────────────
+# Marquées « installées à la demande », bien que sans doute tirées aussi
+# comme dépendances (brew uses --installed <nom>). Les garder ne coûte rien.
+brew "openssl@3"
+brew "pcre2"
+brew "libsodium"
+
+# ── Réseau et sécurité ───────────────────────────────────────
+# unbound et chrony : services démarrés en root par
+# configure-network-security.sh, d'où l'absence de restart_service.
+brew "unbound"                        # DNS de repli hors tunnel
+brew "chrony"                         # NTS, remplace timed
+cask "mullvad-vpn"
+cask "little-snitch"                  # pare-feu applicatif
+
+# ── Mots de passe et chiffrement ─────────────────────────────
+cask "1password"
+cask "1password-cli"
+cask "proton-pass"
+cask "veracrypt-fuse-t"
+cask "dangerzone"                     # PDF et documents Office désamorcés
+
+# ── Navigateurs ──────────────────────────────────────────────
+cask "firefox"                        # profil novpn : firefox-novpn-setup
+cask "brave-browser"
+cask "mullvad-browser"
+cask "tor-browser"
+
+# ── Proton ───────────────────────────────────────────────────
+# Sur Arch, webapps Brave (webapp-focus) ; ici, clients natifs.
+cask "proton-mail"
+cask "proton-drive"
+
+# ── Fichiers, synchronisation et sauvegarde ──────────────────
+brew "syncthing", restart_service: :changed
+cask "localsend"
+cask "carbon-copy-cloner"
+cask "fuse-t"
+cask "macos-fuse-t/cask/fuse-t-sshfs"
+
+# ── Musique et vidéo ─────────────────────────────────────────
+# mpd : sur un Mac neuf, le service démarre avant le déploiement de
+# ~/.mpd/mpd.conf (script before_). S'il ne joue rien ensuite :
+# brew services restart mpd
+brew "mpd", restart_service: :changed
+brew "mpc"
+brew "ncmpcpp"
+brew "mpv"
+brew "media-control"                  # pendant de playerctl
+brew "ffmpeg"
+brew "ffmpeg-full"                    # conv : zscale, requis pour le HDR
+
+# ── Images, PDF et conversions ───────────────────────────────
+brew "imagemagick"                    # conv
+brew "poppler"                        # conv
+brew "ghostscript"
+brew "exiftool"
+cask "gimp"
+cask "affinity-photo"
+cask "affinity-designer"
+cask "upscayl"
+cask "calibrite-profiler"             # calibration d'écran (Arch : argyllcms)
+
+# ── Polices et symboles ──────────────────────────────────────
+cask "font-hack-nerd-font"
+cask "font-meslo-lg-nerd-font"
+cask "font-symbols-only-nerd-font"
+cask "sf-symbols"
+
+# ── Bureautique et notes ─────────────────────────────────────
+cask "libreoffice"
+cask "obsidian"
